@@ -488,6 +488,56 @@ back up and reach it via an SSH tunnel through the jump host, never through the 
 
 ---
 
+### 2026-09-26 — Worker Docker build target: found and fixed a NetBird/Docker DNS conflict on VM-A
+
+**What / why:** implement the real `worker` build stage (poppler-utils + the esbuild bundle from
+agents-core) now that `web/worker/index.ts` exists, per the lead's spec. Verified by building on
+VM-A directly (not locally — respecting the earlier memory-pressure note).
+
+Shipped the current commit to VM-A the same way `deploy-to-vultr.md` does (`git archive HEAD |
+ssh ... tar -x`), pointed `/opt/kettle/current` at it, `docker compose build`.
+
+**Found:** the build failed — `apk add poppler-utils` inside the `worker` stage got `DNS:
+transient error` and couldn't resolve Alpine's package mirror at all. Root cause: **installing the
+NetBird client on VM-A earlier had overwritten `/etc/resolv.conf`** to point at NetBird's own DNS
+server (`100.75.158.87`, its WireGuard overlay IP, for resolving `.netbird.selfhosted` peer names).
+Docker copies the host's `resolv.conf` into every container's network namespace by default, but
+containers on the default bridge network can't route to a NetBird WireGuard IP the way the host
+can — so **every container on VM-A lost internet DNS resolution** the moment the NetBird client
+was installed, not just this build. This would have silently broken any future `apt`/`npm`/`docker
+pull` inside a container on VM-A.
+
+**Fix:** gave the Docker daemon its own explicit DNS resolvers, independent of the host's
+NetBird-managed `resolv.conf`:
+```
+# /etc/docker/daemon.json on VM-A
+{ "dns": ["1.1.1.1", "8.8.8.8"] }
+```
+`systemctl restart docker`. Confirmed with `docker run --rm alpine:3.24 sh -c "getent hosts
+dl-cdn.alpinelinux.org"` → resolves correctly now. **The host's own `resolv.conf` is untouched**
+(still NetBird-managed, still resolves `.netbird.selfhosted` peer names fine) — this only changes
+what Docker containers see. **Worth remembering: apply the same daemon.json fix on any other VM
+that gets both a NetBird client and Docker (VM-B already has Docker but no NetBird-DNS conflict
+observed there yet since it was set up before the client's DNS override — worth a quick check if
+Docker networking ever looks odd on VM-B too).**
+
+**Build result (after the DNS fix):** both `kettle-web:latest` (~297MB) and `kettle-worker:latest`
+(~275MB) built successfully. Worker image contents: just `worker/dist/index.js` (2.6MB, matches
+the expected self-contained bundle size) — no `node_modules`, confirming the worker stage doesn't
+carry the whole app. `pdftoppm -v` inside the worker image → `pdftoppm version 25.12.0` (poppler
+present, correct package this time). Smoke test: `docker compose up -d` with a **placeholder,
+non-real `.env`** (verification only, not a deploy) — `web` healthcheck → `200 {"status":"ok"}`;
+`worker` correctly crash-looped with `"NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must
+be set"` — expected and correct, since the placeholder env didn't include a real service-role key;
+confirms the worker's own env validation works, not a bug in the Dockerfile/compose. Torn down
+after (`docker compose down`, removed the placeholder `.env`) — **this was a build/smoke
+verification, not the real first deploy**; that's still pending, tracked separately, and the lead
+will be told before it happens.
+
+**Cost impact:** none (build + smoke test on an existing instance, no new resources).
+
+---
+
 ### 2026-09-26 — VM-A and VM-B joined as NetBird peers
 
 **What / why:** connect both app VMs to the self-hosted NetBird network so they can be reached
