@@ -51,6 +51,7 @@ export const JOB_KINDS = [
   "vendor.invoice",
   "customer.payment",
   "approval.decided",
+  "customer.paid",
 ] as const;
 export const jobKindSchema = z.enum(JOB_KINDS);
 export type JobKind = z.infer<typeof jobKindSchema>;

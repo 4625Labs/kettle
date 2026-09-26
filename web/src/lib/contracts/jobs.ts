@@ -8,6 +8,8 @@ export const runStartPayload = z.object({
   agent: z.enum(["sales", "procurement", "finance", "orchestrator"]),
   goal: z.string(),
   deal_id: uuidSchema.optional(),
+  // W3: make the selected vendor overbill on its first invoice (stored in agent_runs.options).
+  inject_anomaly: z.boolean().optional(),
 });
 export type RunStartPayload = z.infer<typeof runStartPayload>;
 
@@ -48,10 +50,21 @@ export const customerPaymentPayload = z.object({
 export type CustomerPaymentPayload = z.infer<typeof customerPaymentPayload>;
 
 // A human decided a pending approval; resume the waiting agent step.
+// Enqueued by the approvals_enqueue_decided trigger (0004).
 export const approvalDecidedPayload = z.object({
   approval_id: uuidSchema,
+  run_id: uuidSchema.nullable().optional(),
+  decision: z.enum(["approved", "rejected"]).optional(),
 });
 export type ApprovalDecidedPayload = z.infer<typeof approvalDecidedPayload>;
+
+// Simulated customer settled (or missed) a receivable; Finance tells Sales (S4, F5).
+export const customerPaidPayload = z.object({
+  runId: uuidSchema.nullable().optional(),
+  invoiceId: uuidSchema,
+  status: z.enum(["paid", "overdue"]),
+});
+export type CustomerPaidPayload = z.infer<typeof customerPaidPayload>;
 
 export const JOB_PAYLOAD_SCHEMAS = {
   "run.start": runStartPayload,
@@ -61,6 +74,7 @@ export const JOB_PAYLOAD_SCHEMAS = {
   "vendor.invoice": vendorInvoicePayload,
   "customer.payment": customerPaymentPayload,
   "approval.decided": approvalDecidedPayload,
+  "customer.paid": customerPaidPayload,
 } as const satisfies Record<JobKind, z.ZodTypeAny>;
 
 export type JobPayload<T extends JobKind> = z.infer<(typeof JOB_PAYLOAD_SCHEMAS)[T]>;
