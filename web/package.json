@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "worker:build": "esbuild worker/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=worker/dist/index.js --tsconfig=tsconfig.json --log-level=warning",
+    "worker:dev": "tsx --env-file=.env.local worker/index.ts",
+    "bench": "tsx --env-file=.env.local evals/model-bench.ts",
+    "eval": "tsx --env-file=.env.local evals/golden-path.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -21,9 +25,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

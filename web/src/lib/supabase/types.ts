@@ -29,6 +29,7 @@ export type Database = {
           completed_at: string | null;
           goal: string;
           id: string;
+          options: NonNullable<Json>;
           started_at: string;
           status: string;
         };
@@ -37,6 +38,7 @@ export type Database = {
           completed_at?: string | null;
           goal: string;
           id?: string;
+          options?: NonNullable<Json>;
           started_at?: string;
           status?: string;
         };
@@ -45,6 +47,7 @@ export type Database = {
           completed_at?: string | null;
           goal?: string;
           id?: string;
+          options?: NonNullable<Json>;
           started_at?: string;
           status?: string;
         };
