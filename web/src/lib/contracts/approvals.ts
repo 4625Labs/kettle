@@ -20,10 +20,13 @@ export const approvalInsertSchema = z.object({
 });
 export type ApprovalInsert = z.infer<typeof approvalInsertSchema>;
 
-// What the UI sends when a human decides a pending approval (RLS also enforces required_role).
+// What the UI sends when a human decides a pending approval. `decided_by` must be the caller's
+// own auth.uid() — RLS rejects the update otherwise (and the UPDATE grant is scoped to exactly
+// these columns, so no other field can be changed in the same statement).
 export const approvalDecisionSchema = z.object({
   status: z.enum(["approved", "rejected"]),
   decided_by: uuidSchema,
+  decided_at: z.iso.datetime({ offset: true }).optional(),
   note: z.string().optional(),
 });
 export type ApprovalDecision = z.infer<typeof approvalDecisionSchema>;
