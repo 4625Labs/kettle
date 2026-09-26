@@ -49,5 +49,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.svg$).*)"],
+  // Excludes /api/health so Infra's Docker healthcheck gets a 200 without
+  // auth. Keep this the only public API route — anything else under /api
+  // needs its own exception here, reviewed the same way.
+  matcher: ["/((?!api/health|_next/static|_next/image|favicon.ico|.*\\.svg$).*)"],
 };

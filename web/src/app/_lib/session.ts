@@ -2,21 +2,9 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { profileRoleSchema, type ProfileRole } from "@/lib/contracts";
 
-export type Role = "ops_manager" | "sales_rep" | "finance_controller";
-
-const ROLES: readonly Role[] = ["ops_manager", "sales_rep", "finance_controller"];
-
-function isRole(value: unknown): value is Role {
-  return typeof value === "string" && (ROLES as readonly string[]).includes(value);
-}
-
-// TODO(data): once migration 0002 lands, replace this with a `profiles` table
-// join (id = auth.users.id) instead of reading user_metadata.
-function roleOf(user: { user_metadata?: Record<string, unknown> }): Role {
-  const claimed = user.user_metadata?.role;
-  return isRole(claimed) ? claimed : "ops_manager";
-}
+export type Role = ProfileRole;
 
 export const getUser = cache(async () => {
   const supabase = await createClient();
@@ -26,11 +14,25 @@ export const getUser = cache(async () => {
   return user;
 });
 
-export async function getSession() {
+// A user with no `profiles` row (or an unrecognized role) is treated as
+// unauthorized, never defaulted to a role — profiles is the single source of
+// truth for who can approve what.
+export const getSession = cache(async () => {
   const user = await getUser();
   if (!user) return null;
-  return { user, role: roleOf(user) };
-}
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const parsed = profileRoleSchema.safeParse(profile?.role);
+  if (!parsed.success) return null;
+
+  return { user, role: parsed.data };
+});
 
 export async function requireSession() {
   const session = await getSession();
