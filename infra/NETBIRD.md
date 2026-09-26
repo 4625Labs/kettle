@@ -13,21 +13,21 @@ secrets/setup keys live in env files, never in this doc.
 | VM-A peer | **done** |
 | VM-B peer | **done** |
 | Peer Expose enabled (account setting) | **done** — user confirmed |
-| `kettle.4625labs.com` service active | user created it; hairpin-NAT fixed but **still blocked on its SSO/OIDC auth** — see below |
-| Auth configured (SSO/password gating the service) | SSO configured but not yet working; recommend switching to password |
+| `kettle.4625labs.com` service active | **done and verified** — user switched auth to password; `401` with the NetBird auth form renders correctly end to end |
+| Auth configured (SSO/password gating the service) | **done** — password auth, confirmed working |
 | Supabase API service active | **done and verified** — `curl .../auth/v1/health` returns a real `401`, not a timeout |
 | VM-A port scan clean (no public ports) | todo |
 | Per-run `netbird expose` working and expiring | todo |
 
-Overall: **7/11 done** — Supabase API service now fully working; `kettle.4625labs.com` blocked only
-on its SSO auth config (fix recommended below).
+Overall: **9/11 done** — both reverse-proxy services fully working, first deploy is live behind
+`kettle.4625labs.com`. Remaining: VM-A port scan, per-run `netbird expose` (N4).
 
 ## 2. Bonus scorecard
 
 | Criterion | Evidence |
 |---|---|
-| No open ports (VM-A) | not yet — pending NetBird client + peer setup on VM-A |
-| Gated access | not yet — dashboard is live at `https://netbird.4625labs.com` (`200`, valid Let's Encrypt cert) but no admin user exists yet; pending service auth config |
+| No open ports (VM-A) | NetBird peer + client installed, port scan not yet run — pending |
+| Gated access | **done** — `https://kettle.4625labs.com` returns `401` with NetBird's password auth form; app itself is running behind it (deployed `55071a5`, see `DEPLOYS.md`) |
 | Lifecycle-bound URLs | not yet — pending worker integration of `netbird expose` (NetBird Proxy component is running, confirmed via `docker ps`) |
 
 ## 3. What was done
@@ -169,13 +169,18 @@ Nothing billable has been created yet — topology/cost plan is pending user app
   entirely.
 - **Result: `api.netbird.4625labs.com` now works** — `curl .../auth/v1/health` → real `401` from
   GoTrue (not a timeout). ✅
-- **`kettle.4625labs.com` still times out**, but for a narrower, different reason now: its
-  **SSO/OIDC auth scheme** makes its own "get OIDC URL" call that's still failing the same way
-  (`context canceled`) even though the underlying Signal connection is fixed. Recommended fix:
-  **switch this service's auth from SSO to password** in the dashboard (Services → edit → Auth
-  tab) — sidesteps the OIDC discovery step entirely, and password auth is already proven working
-  via the sibling service. Not yet done.
-  "proxy"/"gateway" source group, separate from the peer list.
+- **`kettle.4625labs.com` still timed out at this point**, for a narrower, different reason: its
+  **SSO/OIDC auth scheme** made its own "get OIDC URL" call that was still failing the same way
+  (`context canceled`) even though the underlying Signal connection was fixed. Recommended fix:
+  switch the service's auth from SSO to password. **Resolved** — see the next entry.
+
+### 2026-09-26 — First deploy live; `kettle.4625labs.com` confirmed working end to end
+- User switched `kettle.4625labs.com`'s auth from SSO to password.
+- Deployed `main @ 55071a5` to VM-A (full detail in `DEPLOYS.md`). `curl -sSi
+  https://kettle.4625labs.com` from VM-C → `401` with NetBird's password/PIN auth page rendering
+  correctly (`title: NetBird Service`). The app itself is running behind it and healthy.
+- **Both reverse-proxy services now fully verified working.** Remaining NetBird items: VM-A port
+  scan (bonus evidence) and per-run `netbird expose` (N4).
 
 ## 4. Values
 
@@ -186,10 +191,11 @@ Nothing billable has been created yet — topology/cost plan is pending user app
 | VM-A public / private IP | `64.177.51.161` / `10.10.0.3` |
 | VM-B public / private IP | `96.30.205.155` / `10.10.0.4` |
 | BigRock DNS records needed now | `A netbird.4625labs.com` → `144.202.22.122`; `CNAME *.netbird.4625labs.com` → `netbird.4625labs.com`; `CNAME kettle.4625labs.com` → `netbird.4625labs.com` (fallback `kettle.netbird.4625labs.com` if custom domain unsupported) |
-| Dashboard URL | `https://netbird.4625labs.com` (live, no admin account yet) |
+| Dashboard URL | `https://netbird.4625labs.com` (live, admin account working) |
 | VM-A peer name / IP | `kettle-app.netbird.selfhosted` / `100.75.158.87` (NetBird overlay) |
 | VM-B peer name / IP | `kettle-db.netbird.selfhosted` / `100.75.132.16` (NetBird overlay) |
-| `kettle.4625labs.com` service | not yet created |
-| Supabase API service name/URL | not yet created — plan: `api.netbird.4625labs.com` → VM-B peer `:8000` (Envoy gateway, confirmed listening) |
-| Auth method | not yet decided (SSO vs password) |
-| Supabase gateway (VM-B) | `http://10.10.0.4:8000` — 11/11 containers healthy, confirmed reachable from VM-A over the VPC |
+| `kettle.4625labs.com` service | **live** — HTTP, → `kettle-app:3000`, password auth, verified `401` + auth form |
+| Supabase API service | **live** — `https://api.netbird.4625labs.com` → `kettle-db:8000` (Envoy), no auth (relies on Supabase keys/RLS), verified `401` from GoTrue |
+| Auth method | password (for `kettle.4625labs.com`); none for the Supabase API service (by design) |
+| Supabase gateway (VM-B) | `http://10.10.0.4:8000` — 8/8 containers healthy (Studio/imgproxy/edge-functions intentionally stopped), confirmed reachable from VM-A over the VPC |
+| First deploy | `main @ 55071a5`, 2026-09-26 23:33 UTC — see `DEPLOYS.md` |
