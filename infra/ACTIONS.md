@@ -671,3 +671,15 @@ heartbeat-healthy, `kettle.4625labs.com` verified serving the NetBird password g
 (`401` + auth form) once the user switched that service off SSO.
 
 **Cost impact:** none (deploy to an existing instance, no new resource).
+
+---
+
+### 2026-09-26 — Second external port-scan vantage point (VM-C nmap)
+
+**What / why:** the lead independently scanned VM-A/VM-B from the venue network (all filtered);
+add a second, different external vantage point per their ask, "if it's cheap."
+
+**Remote:** `apt-get install -y nmap` on VM-C, then
+`nmap -Pn -p 22,80,443,3000,5432,8000 64.177.51.161 96.30.205.155` from VM-C.
+**Result:** all 6 ports on both IPs → `filtered`. Matches the lead's independent scan exactly.
+**Cost impact:** none.

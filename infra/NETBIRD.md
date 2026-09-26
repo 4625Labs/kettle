@@ -16,19 +16,20 @@ secrets/setup keys live in env files, never in this doc.
 | `kettle.4625labs.com` service active | **done and verified** — user switched auth to password; `401` with the NetBird auth form renders correctly end to end |
 | Auth configured (SSO/password gating the service) | **done** — password auth, confirmed working |
 | Supabase API service active | **done and verified** — `curl .../auth/v1/health` returns a real `401`, not a timeout |
-| VM-A port scan clean (no public ports) | todo |
-| Per-run `netbird expose` working and expiring | todo |
+| VM-A port scan clean (no public ports) | **done** — two independent external scans, all filtered |
+| Per-run `netbird expose` working and expiring | todo — design below, not yet implemented |
 
-Overall: **9/11 done** — both reverse-proxy services fully working, first deploy is live behind
-`kettle.4625labs.com`. Remaining: VM-A port scan, per-run `netbird expose` (N4).
+Overall: **10/11 done** — both reverse-proxy services fully working, first deploy live behind
+`kettle.4625labs.com`, port scan confirmed clean from two independent vantage points. Remaining:
+per-run `netbird expose` (N4) — design in progress, see below.
 
 ## 2. Bonus scorecard
 
 | Criterion | Evidence |
 |---|---|
-| No open ports (VM-A) | NetBird peer + client installed, port scan not yet run — pending |
+| No open ports (VM-A, VM-B) | **done** — two independent external scans, both all-filtered: (1) **lead-run, 2026-09-26, from the venue network**: `64.177.51.161` and `96.30.205.155`, ports `22/80/443/3000/5432/8000`, all filtered/no response, while `kettle.4625labs.com` stayed reachable via NetBird. (2) **this agent, 2026-09-26, `nmap -Pn` from VM-C** (a second, different public vantage point): same ports on both IPs, all `filtered`. Zero open ports confirmed from two independent external locations. |
 | Gated access | **done** — `https://kettle.4625labs.com` returns `401` with NetBird's password auth form; app itself is running behind it (deployed `55071a5`, see `DEPLOYS.md`) |
-| Lifecycle-bound URLs | not yet — pending worker integration of `netbird expose` (NetBird Proxy component is running, confirmed via `docker ps`) |
+| Lifecycle-bound URLs | not yet — design in progress (N4), see entry below |
 
 ## 3. What was done
 
