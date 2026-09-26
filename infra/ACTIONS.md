@@ -683,3 +683,46 @@ add a second, different external vantage point per their ask, "if it's cheap."
 `nmap -Pn -p 22,80,443,3000,5432,8000 64.177.51.161 96.30.205.155` from VM-C.
 **Result:** all 6 ports on both IPs → `filtered`. Matches the lead's independent scan exactly.
 **Cost impact:** none.
+
+---
+
+### 2026-09-26 — URGENT fix: web wasn't bound to VM-A's NetBird IP, so kettle.4625labs.com 502'd
+
+**What happened:** after logging in past the NetBird password page, the user got a 502 "service
+unreachable." Diagnosed per the lead's exact steps:
+- From VM-B: `curl -m5 http://100.75.158.87:3000/api/health` (VM-A's NetBird IP) → connection
+  refused.
+- On VM-A: `ss -tlnp | grep 3000` → only `127.0.0.1:3000`, nothing on the NetBird IP.
+**Root cause confirmed:** `docker-compose.yml`'s `web` service only published `127.0.0.1:3000`.
+The NetBird reverse-proxy on VM-C reaches peers over the NetBird mesh (VM-A's overlay IP,
+`100.75.158.87`), not `127.0.0.1` — nothing was listening there.
+
+**Fix (lead-approved, config only, $0):**
+1. Added a second `ports` entry, `"100.75.158.87:3000:3000"`, to both the deployed
+   `/opt/kettle/current/web/docker-compose.yml` and the source `web/docker-compose.yml` (so the
+   next deploy carries it forward). Documented in a comment that this IP is VM-A-specific and
+   needs updating if VM-A is ever rebuilt with a new NetBird IP.
+2. Added a systemd drop-in so Docker always starts after the NetBird client (the WireGuard
+   interface must exist before Docker can bind to that IP):
+   ```
+   # /etc/systemd/system/docker.service.d/netbird-order.conf
+   [Unit]
+   After=netbird.service
+   Wants=netbird.service
+   ```
+   `systemctl daemon-reload`.
+3. `docker compose up -d` to recreate `web` with the new port binding.
+
+**Verified:**
+- `ss -tlnp` on VM-A: both `127.0.0.1:3000` and `100.75.158.87:3000` listening.
+- `curl http://100.75.158.87:3000/api/health` from **VM-B** (a real peer, not localhost) → `200
+  {"status":"ok"}`.
+- `curl -sSI https://kettle.4625labs.com` from VM-C → `401` (NetBird auth page, as expected —
+  proxy can now reach the backend).
+- `systemctl restart docker` on VM-A → both containers came back `healthy`/`Up`, both port
+  bindings re-established automatically, health check via the NetBird IP still `200`. **Not yet
+  tested: a full VM-A reboot** (only the docker daemon was restarted, not the whole VM) — the
+  systemd ordering directive should cover that too, but it's unverified since `netbird.service` was
+  already running the entire time in this test.
+
+**Cost impact:** none (config-only fix on existing instances).
