@@ -109,5 +109,6 @@ Nothing billable has been created yet — topology/cost plan is pending user app
 | VM-A peer name / IP | `kettle-app.netbird.selfhosted` / `100.75.158.87` (NetBird overlay) |
 | VM-B peer name / IP | `kettle-db.netbird.selfhosted` / `100.75.132.16` (NetBird overlay) |
 | `kettle.4625labs.com` service | not yet created |
-| Supabase API service name/URL | not yet created |
+| Supabase API service name/URL | not yet created — plan: `api.netbird.4625labs.com` → VM-B peer `:8000` (Envoy gateway, confirmed listening) |
 | Auth method | not yet decided (SSO vs password) |
+| Supabase gateway (VM-B) | `http://10.10.0.4:8000` — 11/11 containers healthy, confirmed reachable from VM-A over the VPC |
