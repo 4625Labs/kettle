@@ -726,3 +726,89 @@ The NetBird reverse-proxy on VM-C reaches peers over the NetBird mesh (VM-A's ov
   already running the entire time in this test.
 
 **Cost impact:** none (config-only fix on existing instances).
+
+---
+
+### 2026-09-26 — Applied migration 0007 to VM-B (lead-approved)
+
+`web/supabase/migrations/0007_deals_read_policy.sql` (adds `authenticated_read` SELECT policy on
+`deals` — 0002 had dropped the demo allow-all policy but never restored read access). Copied to
+VM-B, applied via `docker exec -i supabase-db psql -U postgres -v ON_ERROR_STOP=1 < 0007...sql` —
+`CREATE POLICY`, no errors. Confirmed: `select policyname from pg_policies where
+tablename='deals'` → `deals_write`, `deals_update`, `authenticated_read` (all 3 expected).
+**Cost impact:** none.
+
+---
+
+### 2026-09-26 — SECURITY: `bash -x` leaked real secrets into this agent's own output
+
+**What happened:** while debugging a crash in the new N4 watcher script, ran
+`bash -x /opt/kettle/kettle-expose-watcher.sh` to trace it. The script does
+`set -a; source /opt/kettle/current/web/.env; set +a` to load its env — `bash -x` traces every
+simple command, including each `VAR=value` assignment made while sourcing that file. **This
+printed the full, real values of `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
+`VULTR_INFERENCE_API_KEY` directly into this agent's own tool output** — unlike the earlier
+`setup.sh` incident, this one was this agent's own command choice, not an unavoidable upstream
+default. Should have anticipated that trace mode would walk through a sourced secrets file and
+used a narrower debugging approach (e.g., `bash -n` for syntax only, or tracing a copy of the
+script with the `source` line stubbed out).
+
+**Also separately:** a `pgrep -af "netbird expose"` call during testing displayed the (throwaway
+test run's) PIN in full, since NetBird only exposes the PIN via the process's command-line
+arguments — an inherent limitation of listing process command lines this way, not fixable without
+avoiding `-af`/full-args process listings entirely. Low severity here since it was a disposable
+smoke-test PIN, deleted moments later, but noting the general pattern: **never use `-af`-style
+full-command-line process listing near a `netbird expose` process; use `pgrep -f <pattern>`
+without printing the matched command line, or grep the PID only.**
+
+**Recommended remediation:** rotate `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+again (same suppressed-output procedure as the earlier rotation — `utils/generate-keys.sh
+--update-env >/dev/null 2>&1`, restart the Supabase stack, redeploy the app with the new keys), and
+ask the lead/user to rotate `VULTR_INFERENCE_API_KEY` via the Vultr console (this agent has no
+access to that dashboard) and update it in the deployed `.env`. Not yet done — reported for a
+decision on timing given how close the deadline is.
+
+**Cost impact:** none directly, but this is a real exposure that should be remediated.
+
+---
+
+### 2026-09-26 — N4 built and tested: per-run lifecycle-bound NetBird URLs
+
+**What / why:** REQUIREMENTS N4 — each `running` agent run gets an ephemeral, PIN-protected
+`netbird expose` URL that dies when the run completes. Lead-approved simplified design: no
+migration, no worker change, host-side watcher polling `agent_runs` directly via PostgREST.
+
+**Built:** `infra/scripts/kettle-expose-watcher.sh` (bash + curl + jq) and
+`infra/scripts/kettle-expose-watcher.service` (systemd unit, `Restart=always`,
+`After=/Wants=netbird.service docker.service`). Deployed to `/opt/kettle/kettle-expose-watcher.sh`
+(700, root) and `/etc/systemd/system/kettle-expose-watcher.service` on VM-A, `systemctl enable
+--now`.
+
+**Bug found and fixed during testing:** `set -uo pipefail` (nounset) crashed the script
+immediately on its first poll with `RUN_PID: unbound variable`, even though `RUN_PID` is a
+declared (just empty) associative array — a known bash nounset/associative-array interaction
+quirk. Fixed by dropping `-u` (`set -o pipefail` only); the script already guards its two required
+env vars explicitly (`: "${VAR:?...}"`) so nounset wasn't adding real safety, just this crash.
+
+**Tested end to end with a throwaway `agent_runs` row** (inserted via PostgREST, `status:
+"running"`, deleted after):
+- Watcher picked it up within one poll cycle, ran `netbird expose 3000 --with-pin <pin>
+  --with-name-prefix run-<8 chars of id>`, parsed the real URL from its stdout (`URL:` line —
+  NetBird appends its own random suffix, e.g. `run-cde98e56-x6xu`, so we read it back rather than
+  guessing the hostname).
+- `agent_runs.options` merged correctly: `expose_url`, `expose_pin`, `expose_started_at` all
+  present, existing keys untouched (none existed yet on this test row, but the merge logic reads
+  current `options` and combines rather than overwriting).
+- Set the run's `status` to `completed` → within one poll cycle, the `netbird expose` process was
+  killed and `options.expose_ended_at` was added.
+- Cleaned up: deleted the test row, removed its temp log file.
+
+**Not yet exercised:** the 10-per-peer skip path, and reconciling real orphaned processes after an
+actual watcher crash (only tested reconciliation logic reading zero pre-existing processes, which
+is the common case, not the crash-recovery path itself).
+
+**Still needed (not infra's lane):** the frontend `agent_runs.options` display (URL + PIN, shown
+to `ops_manager`) and the public `/r/[runId]` (or similar) read-only route — lead is briefing
+Frontend on this after their phase-2 stages 1–3 land.
+
+**Cost impact:** none (host-side script + systemd unit on an existing instance).
