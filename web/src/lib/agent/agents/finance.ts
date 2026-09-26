@@ -57,10 +57,9 @@ export async function issueCustomerInvoice(runId: string, p: CustomerInvoiceCrea
       rationale: `Issued customer invoice ${number} for $${p.amount.toLocaleString("en-US")}, due ${p.due_date}.`,
     });
   }
-  // W4: the simulated customer settles a few seconds later (P1).
-  const run = must(await db.from("agent_runs").select("options").eq("id", runId).single(), "load run");
-  const late = (run.options as Record<string, unknown>)?.customer_late === true;
-  await enqueue("customer.payment", { run_id: runId, invoice_id: invoiceId, on_time: !late }, { delayMs: 2_000 });
+  // W4: the simulated customer settles a few seconds later (P1). Sim decides on-time vs late from
+  // agent_runs.options.customer_pays_late.
+  await enqueue("customer.payment", { run_id: runId, invoice_id: invoiceId }, { delayMs: 2_000 });
 }
 
 export async function expectVendorInvoice(runId: string, p: VendorInvoiceExpectPayload) {

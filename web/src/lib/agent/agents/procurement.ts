@@ -239,7 +239,12 @@ export async function issuePo(runId: string, poId: string) {
     rationale: `Expect an invoice from ${ctx.vendorName} for ${ctx.po.po_number}: ${ctx.quantity} x $${ctx.unitPrice}.`,
   });
 
-  await generateVendorInvoice({ purchaseOrderId: poId, runId, supabase: db, enqueue: enqueueUnknown });
+  await generateVendorInvoice({
+    purchaseOrderId: poId,
+    runId,
+    supabase: db,
+    enqueue: async (kind, payload) => void (await enqueueUnknown(kind, payload)),
+  });
 }
 
 export async function cancelPo(runId: string, poId: string, note: string | null) {

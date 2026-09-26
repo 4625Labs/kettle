@@ -6,14 +6,15 @@ import { serviceDb } from "./db";
 import { completeRun, recordStep, startRun } from "./ledger";
 import * as orchestrator from "./orchestrator";
 import { enqueueUnknown, type JobRow } from "./queue";
-import { simHandlers, type SimJobHandler } from "./sim-bridge";
+import { simHandlers, type SimJob, type SimJobHandler } from "./sim-bridge";
 
 type Handler = (job: JobRow) => Promise<void>;
 
-async function runSim(kind: JobKind, job: JobRow) {
-  const h: SimJobHandler | undefined = simHandlers[kind];
+async function runSim(kind: "vendor.rfq" | "vendor.dispute" | "customer.payment", job: JobRow) {
+  const h = simHandlers[kind] as SimJobHandler | undefined;
   if (!h) throw new Error(`no Sim-world handler registered for ${kind}`);
-  await h(job, { supabase: serviceDb(), enqueue: enqueueUnknown });
+  const simJob = { id: job.id, kind, payload: parseJobPayload(kind, job.payload) } as SimJob;
+  await h(simJob, { supabase: serviceDb(), enqueue: async (k, payload) => void (await enqueueUnknown(k, payload)) });
 }
 
 const HANDLERS: Record<JobKind, Handler> = {
