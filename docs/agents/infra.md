@@ -33,6 +33,34 @@ app VM** and the app served through self-hosted NetBird.
 - Check NetBird's current docs on custom domains for `kettle.4625labs.com`. If it isn't supported,
   fall back to `kettle.netbird.4625labs.com` and tell the user.
 
+## NetBird: starting state and tracking (required)
+**Done before you started (decisions only, nothing provisioned):**
+- Docs reviewed: reverse proxy (beta), `netbird expose` CLI, Vultr marketplace image (ships Traefik,
+  reverse proxy on by default, CrowdSec, local admin user; shared CPU ≥ 2 GB).
+- Topology: VM-C = self-hosted NetBird (management + reverse proxy); VM-A and VM-B = peers.
+  No NetBird on the laptop.
+- Names: dashboard `netbird.4625labs.com`, app `kettle.4625labs.com` (custom domain, not yet
+  confirmed supported), per-run URLs `run-xxxx.netbird.4625labs.com`. DNS at BigRock, added by the user.
+- Bonus criteria mapped to REQUIREMENTS N1–N4.
+
+**Not done yet:** VM-C, DNS records, admin account, peers, Peer Expose setting, services, auth,
+per-run URLs.
+
+Keep `infra/NETBIRD.md` current. It's the single place the user checks for NetBird status:
+1. **Checklist** with status (todo / in progress / done / blocked) for: VM-C created · DNS records
+   added and verified · dashboard reachable + admin created · VM-A peer · VM-B peer · Peer Expose
+   enabled · `kettle.4625labs.com` service active · auth configured · Supabase API service active ·
+   VM-A port scan clean · per-run `netbird expose` working and expiring.
+2. **Bonus scorecard**: the 3 criteria (no open ports, gated access, lifecycle-bound URLs) with the
+   evidence for each (command output, screenshot path, URL).
+3. **What was done**: dated entries with the exact steps, settings chosen, and anything clicked in
+   the dashboard.
+4. **Values**: VM-C IP, peer names/IPs, service names/URLs, auth method. Secrets and setup keys go
+   in env files only, never here.
+
+Every step report to the user ends with a one-line **NetBird status** (e.g. "NetBird: 4/11 done,
+blocked on DNS records").
+
 ## Tasks (in order)
 1. Topology plan: regions, plans, estimated hourly/monthly cost for VM-A, VM-B (Supabase
    marketplace), VM-C (NetBird marketplace), VPC, firewall groups. Must fit the $200 credit through
@@ -46,7 +74,8 @@ app VM** and the app served through self-hosted NetBird.
    127.0.0.1:3000 and `worker` with no ports; the worker entrypoint will be `node worker/dist/index.js`
    — stub it with a heartbeat loop until the agents-core agent delivers it). `GET /api/health`.
 5. Deploy a hello-world build end-to-end through the NetBird URL. Early and ugly is the goal.
-6. Write `infra/README.md` (resources, IPs, how created), `infra/env.example`, `infra/DEPLOYS.md`.
+6. Write `infra/README.md` (resources, IPs, how created), `infra/env.example`, `infra/DEPLOYS.md`,
+   and keep `infra/NETBIRD.md` up to date throughout.
 
 ## Done when
 - Public NetBird URL serves the current app behind auth.
