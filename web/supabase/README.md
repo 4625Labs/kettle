@@ -15,9 +15,11 @@ npx supabase gen types typescript --local > src/lib/supabase/types.ts && npx oxf
 
 `npx supabase status` prints the local API URL, anon key, and service-role key for `.env.local`.
 
-## Demo users (local/dev only — never reuse these against a real deployment)
+## Demo users
 
-Seeded directly into `auth.users` by `seed.sql`, one per role in `profiles`:
+**Local:** `seed.sql` inserts the 3 accounts directly into `auth.users` with a hardcoded
+dev-only password. **Never reuse this against a hosted deployment** — it'll be sitting in a
+public repo.
 
 | Email | Password | Role |
 |---|---|---|
@@ -25,7 +27,20 @@ Seeded directly into `auth.users` by `seed.sql`, one per role in `profiles`:
 | `sales@kettle.demo` | `kettle-demo` | `sales_rep` |
 | `finance@kettle.demo` | `kettle-demo` | `finance_controller` |
 
-## Tables (0001 + 0002)
+**Hosted (Vultr VM-B):** run `create-demo-users.sql` instead, with real passwords from env vars
+(never committed). It's idempotent — safe to re-run to rotate passwords before a demo/judging
+session:
+
+```sh
+KETTLE_OPS_PASSWORD=... KETTLE_SALES_PASSWORD=... KETTLE_FINANCE_PASSWORD=... \
+  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f web/supabase/create-demo-users.sql
+```
+
+It upserts `auth.users`/`auth.identities`/`profiles` for the same 3 fixed ids seed.sql uses, so it
+works whether or not `seed.sql` already ran on that DB. Infra runs this on VM-B as part of
+provisioning — the three `KETTLE_*_PASSWORD` values live in its env, not in this repo.
+
+## Tables (0001 + 0002 + 0003)
 
 **Ledger (0001):** `companies` (kind: customer/vendor/both), `contacts`, `deals`, `purchase_requests`,
 `vendor_quotes`, `purchase_orders`, `invoices` (direction: payable/receivable), `payments`.
@@ -67,11 +82,16 @@ finance_controller` — distinct from the `agent` enum, which names which AI age
 - `approvals`: any signed-in user can read (U3 inbox); only a user whose `profiles.role` matches
   the approval's `required_role`, or `ops_manager`, can move a `pending` approval to
   `approved`/`rejected` — checked in the RLS policy itself (`current_role_name()` reads
-  `profiles` for `auth.uid()`), not just in application code.
+  `profiles` for `auth.uid()`), not just in application code. The `UPDATE` grant to
+  `authenticated` is column-scoped (`status, decided_by, decided_at, note` only — 0003) since
+  Postgres RLS gates rows, not columns; a client can't smuggle a change to `amount`,
+  `required_role`, or `subject_id` into the same request. The policy's `WITH CHECK` also binds
+  `decided_by = auth.uid()`, so you can't record someone else as the approver.
 - `policies`: `ops_manager` can update values (K7).
 - Verified locally: anon read on any table returns `[]`; a `sales_rep` PATCH on a
   `finance_controller`-required approval returns `0` rows updated; `finance_controller` PATCH on
-  the same row succeeds.
+  the same row succeeds; a PATCH that also touches `amount` is rejected outright (permission
+  denied, not just ignored); a PATCH claiming a different `decided_by` is rejected by `WITH CHECK`.
 
 ## Realtime
 
@@ -84,7 +104,12 @@ unauthenticated client gets nothing.
 `select reset_demo();` — security-definer, callable only when the caller's `profiles.role` is
 `ops_manager`. Truncates run/ledger tables (`agent_steps, agent_runs, handoffs, approvals, jobs,
 goods_receipts, payments, invoices, purchase_orders, vendor_quotes, purchase_requests`) and leaves
-seed data (companies, products, vendor personas, policies, users/profiles, the demo deal) intact.
+seed data (companies, products, policies, users/profiles) intact. It also **restores** rows that
+agents mutate in place rather than insert/delete: the demo deal's `stage/value/closed_at` back to
+`won`/`48000.00`/now, and each vendor persona's `reliability` back to its seeded value (ahead of
+P7, which will start updating it from run history) — so a reset always yields a clean golden path,
+not whatever state the last run left things in. These values mirror `seed.sql`; keep both in sync
+if the demo deal or vendor personas change.
 Storage bucket cleanup and killing `netbird expose` child processes are the worker's job, not this
 function's — see `docs/skills/reset-demo.md`.
 
