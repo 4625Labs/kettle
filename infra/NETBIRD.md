@@ -13,13 +13,14 @@ secrets/setup keys live in env files, never in this doc.
 | VM-A peer | **done** |
 | VM-B peer | **done** |
 | Peer Expose enabled (account setting) | **done** — user confirmed |
-| `kettle.4625labs.com` service active | user created it; **blocked** — see below, not yet reachable |
-| Auth configured (SSO/password gating the service) | done as part of service creation (not independently verified — service itself isn't reachable yet) |
-| Supabase API service active | user created it; **blocked** — same root cause |
+| `kettle.4625labs.com` service active | user created it; hairpin-NAT fixed but **still blocked on its SSO/OIDC auth** — see below |
+| Auth configured (SSO/password gating the service) | SSO configured but not yet working; recommend switching to password |
+| Supabase API service active | **done and verified** — `curl .../auth/v1/health` returns a real `401`, not a timeout |
 | VM-A port scan clean (no public ports) | todo |
 | Per-run `netbird expose` working and expiring | todo |
 
-Overall: **6/11 done**, but **2 new blockers found** verifying the services — see below.
+Overall: **7/11 done** — Supabase API service now fully working; `kettle.4625labs.com` blocked only
+on its SSO auth config (fix recommended below).
 
 ## 2. Bonus scorecard
 
@@ -121,6 +122,60 @@ Nothing billable has been created yet — topology/cost plan is pending user app
 - Ruled out as the cause: DNS (correct), the services themselves (both created correctly per the
   user), firewall (irrelevant — this is all internal NetBird overlay routing, not the Vultr cloud
   firewall).
+
+### 2026-09-26 — User added an "All → All" Access Control policy — isolated the remaining gap
+- After the policy was added: **direct peer-to-peer traffic now works.** From VM-A: `ping
+  100.75.132.16` (VM-B) succeeds (0% loss), `curl http://100.75.132.16:8000/rest/v1/` → clean
+  `401`. So the policy fixed peer ↔ peer.
+- **But the two reverse-proxy services still time out** (retested with a 20s timeout, still
+  nothing). Restarted the `netbird` client service on both VM-A and VM-B — no change.
+  `netbird status` still reads "0/2 Connected" on both, but that now looks like a red herring
+  (it's the idle "Lazy connection" counter, not a live traffic indicator — the ping/curl above
+  prove traffic works despite it reading 0).
+- **Isolated:** the gap is specifically **VM-C's reverse-proxy cluster → target peer**, not peer ↔
+  peer. VM-C itself was never joined as a NetBird peer (`netbird up`) — it only runs the
+  server/management/dashboard/proxy stack, so the reverse-proxy component likely uses a distinct
+  network identity ("proxy cluster") to reach service targets, separate from the peer ACL that
+  just started working.
+- **Needs from the user, next:** check the **Services status column** (Reverse Proxy → Services)
+  for both services — NetBird docs mention a `tunnel_not_created` status meaning exactly "the
+  proxy cluster hasn't established a tunnel to the target" yet. If either shows that, try editing
+  and re-saving the service (forces a resync) since the ACL policy was added *after* the services
+  were created — the tunnel attempt may only trigger on create/edit, not automatically once a
+  policy appears later. Also worth checking Access Control for anything explicitly naming a
+
+### 2026-09-26 — Actual root cause: Docker hairpin NAT, not ACLs or ports
+- `netbird-server` logs confirm both services are `status: active` with certs issued — server-side
+  config is fine. The recurring failure is entirely inside the `netbird-proxy` container, looping
+  every ~30-40s independent of any client request: `"error while connecting to the Signal Exchange
+  Service netbird.4625labs.com:443: context canceled"`.
+- Isolated with a raw TCP test: `docker exec netbird-proxy nc -zv -w 5 144.202.22.122 443` →
+  **"Operation timed out"**. Internal Docker traffic (`nc netbird-server 80`) works instantly. The
+  VM-C host itself (outside any container) reaches its own public IP fine.
+- **This is the classic Docker hairpin-NAT limitation**: a container on the custom bridge network
+  can't loop back through its own host's public IP the way an external client can. `netbird-proxy`
+  reaches `netbird-server` for Management via an internal address (`http://netbird-server:80`,
+  works fine) but reaches Signal/relay via its own **public domain**
+  (`netbird.4625labs.com:443`) — which routes out and can't hairpin back in.
+- **Has nothing to do with `51820/udp` or WireGuard** — in reverse-proxy mode, signal/relay/mgmt
+  all multiplex over 443 (confirmed from NetBird's port-requirements doc), and that's exactly the
+  connection that's failing here, at the plain TCP level, before any WireGuard handshake would even
+  start. **No firewall change needed** — external clients (real judges/browsers) never touch this
+  internal loopback path; peer-to-peer traffic already proved this via the ping/curl test above.
+- **Fix applied (user approved), confirmed working for the hairpin itself:** added
+  `extra_hosts: ["netbird.4625labs.com:172.30.0.10"]` to the `proxy` service in
+  `/root/docker-compose.yml` on VM-C, recreated just that container. `nc`/`wget` from inside the
+  container to its own public domain now work; the recurring Signal-connection error loop stopped
+  entirely.
+- **Result: `api.netbird.4625labs.com` now works** — `curl .../auth/v1/health` → real `401` from
+  GoTrue (not a timeout). ✅
+- **`kettle.4625labs.com` still times out**, but for a narrower, different reason now: its
+  **SSO/OIDC auth scheme** makes its own "get OIDC URL" call that's still failing the same way
+  (`context canceled`) even though the underlying Signal connection is fixed. Recommended fix:
+  **switch this service's auth from SSO to password** in the dashboard (Services → edit → Auth
+  tab) — sidesteps the OIDC discovery step entirely, and password auth is already proven working
+  via the sibling service. Not yet done.
+  "proxy"/"gateway" source group, separate from the peer list.
 
 ## 4. Values
 
