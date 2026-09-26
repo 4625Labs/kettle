@@ -1,7 +1,6 @@
-// Mock-only shape for the run view until the Data agent's `agent_steps` /
-// `handoffs` migration (0002) lands and Realtime subscriptions replace this
-// fixture. Field names mirror the planned schema (docs/agents/data.md) so the
-// swap is a drop-in.
+// Canonical run-view UI shape. `run/_lib/map.ts` builds these from real
+// agent_steps/handoffs/approvals rows; `run/_mock/data.ts` builds them by hand
+// for the `?state=` preview hook. Both feed the same `RunView` component.
 
 export type Agent = "sales" | "procurement" | "finance" | "orchestrator";
 export type StepStatus = "ok" | "error" | "flagged";
