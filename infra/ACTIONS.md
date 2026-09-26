@@ -328,3 +328,53 @@ lead with a rebuild recommendation; not yet acted on.
 confirmed active. Docker 29.1.3 + Compose 2.40.3 installed and running. NetBird client 0.79.0
 installed, service running, **not connected** (no `netbird up` yet, as planned).
 **Cost impact:** none.
+
+---
+
+### 2026-09-26 — VM-B rebuild (user-approved): messy API behavior, worth flagging for future work
+
+**Goal:** same recipe as VM-C — `PATCH` to plain Ubuntu 24.04 (`os_id 2284`), same IP
+(`96.30.205.155`), then self-host Supabase manually. Ran into unexpected Vultr API behavior
+switching a *marketplace-app* instance's `os_id` directly (this did NOT happen for VM-C — worth
+remembering next time):
+
+1. `PATCH {"os_id": 2284, "user_data": "<b64>"}` → **`400 "Invalid operating system"`.** (VM-B's
+   `image_id` was still `"supabase"` at this point.)
+2. `PATCH {"os_id": 2284, "image_id": "", "app_id": 0, "user_data": "..."}` → `400 "please provide
+   one app_id, image_id, iso_id, os_id, or snapshot_id"` (API rejects multiple id-type fields at
+   once, even when clearing them).
+3. `PATCH {"app_id": 0, "user_data": "..."}` → `400 "Invalid application."`
+4. `PATCH {"image_id": "", "user_data": "..."}` → `422 "Must provide either the App ID or the App
+   Name..."`
+5. Vultr's API itself returned a `504` maintenance page briefly during this (`api.vultr.com`
+   general outage, unrelated to us) — waited ~2 min, confirmed recovered via `GET /v2/regions`.
+6. `PATCH {"os_id": 1743}` (Ubuntu 22.04, testing whether ANY os_id change worked) → **also
+   returned `400 "Invalid operating system"`** — but a follow-up `GET /v2/instances/{id}` showed
+   the instance **had actually been reinstalled** to Ubuntu 22.04 anyway (`os_id: 1743`, `image_id:
+   ""`, fresh `default_password`), **without our user_data/SSH key** (that call didn't include
+   any). **The API's error response did not reflect the real outcome — flag this for any future
+   Vultr OS/app-change call: always re-`GET` the instance after a "failed" PATCH before assuming
+   nothing happened.**
+7. Immediately re-ran `PATCH {"os_id": 2284, "user_data": "<same b64 as VM-C>"}` — this time
+   `202 Accepted`, clean: `os_id: 2284`, `image_id: ""`, `main_ip: 96.30.205.155` (unchanged),
+   `power_status: stopped` (reinstalling).
+
+**Working theory:** you cannot change `os_id` directly on an instance that still has a marketplace
+`image_id` attached in one clean call; something about steps 2-4 (even though each individually
+errored) incrementally cleared the app association server-side, and only then did an `os_id`
+change actually take effect (step 6, silently) and behave normally afterward (step 7). Not
+confirmed against Vultr docs — surfaced to the lead as a real gap in available documentation.
+
+**Cost impact:** none (same instance, reinstall only, no new resource). **No SSH key ever reached
+the box during the Ubuntu 22.04 blip (step 6)** — it was wiped again seconds later in step 7
+before anyone tried to log in, so there was no window of unprotected/inaccessible state that
+mattered in practice.
+
+**Result:** booted in ~5 min. Confirmed `ssh -J root@144.202.22.122 root@10.10.0.4` (over the VPC,
+via VM-C as jump host — VM-B's own firewall never allows a public-IP SSH attempt, by design)
+works: `docker`, `docker compose`, `jq` all present and active, matching VM-A/VM-C's recipe.
+Same public IP confirmed unchanged: `96.30.205.155`.
+
+Next: generate fresh secrets on the box (Postgres password, JWT secret, anon/service-role keys,
+dashboard password), self-host Supabase via their official docker-compose, apply migrations +
+seed + demo users. Not started yet.
