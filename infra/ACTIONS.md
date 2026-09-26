@@ -657,3 +657,17 @@ through this same proxy. Not yet done — needs the user to change it in the das
 edit `kettle.4625labs.com` → Authentication tab).
 
 **Cost impact:** none.
+
+---
+
+### 2026-09-26 — First deploy: `main @ 55071a5` to VM-A (user approved directly)
+
+Full detail in `infra/DEPLOYS.md`. Summary: shipped via `git archive`, built real env into
+`/opt/kettle/current/web/.env` by piping values directly between SSH sessions (VM-B's Supabase
+keys renamed in-flight via `sed`, Vultr Inference keys from the lead's local `web/.env.local`) —
+no secret value ever appeared in this agent's own output. Hit and fixed a one-off buildkit
+snapshot corruption (`docker builder prune -f`). Both containers up, health check `200`, worker
+heartbeat-healthy, `kettle.4625labs.com` verified serving the NetBird password gate correctly
+(`401` + auth form) once the user switched that service off SSO.
+
+**Cost impact:** none (deploy to an existing instance, no new resource).
