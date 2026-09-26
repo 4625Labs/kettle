@@ -9,7 +9,7 @@ secrets/setup keys live in env files, never in this doc.
 |---|---|
 | VM-C created | **done** (rebuilt once — see below) |
 | DNS records added and verified (`dig @1.1.1.1`) | **done** |
-| Dashboard reachable + admin created | dashboard reachable (done); admin account **not yet created** — waiting on the user to do this themselves in-browser |
+| Dashboard reachable + admin created | **done** — user confirmed admin account works, Peers shows kettle-app and kettle-db |
 | VM-A peer | **done** |
 | VM-B peer | **done** |
 | Peer Expose enabled (account setting) | todo |
@@ -19,8 +19,8 @@ secrets/setup keys live in env files, never in this doc.
 | VM-A port scan clean (no public ports) | todo |
 | Per-run `netbird expose` working and expiring | todo |
 
-Overall: **4.5/11 done** (VM-C created, DNS verified, dashboard reachable but no admin yet, VM-A
-peer, VM-B peer).
+Overall: **5/11 done** (VM-C created, DNS verified, dashboard + admin working, VM-A peer, VM-B
+peer). Next: Peer Expose, the two reverse-proxy services, auth.
 
 ## 2. Bonus scorecard
 
