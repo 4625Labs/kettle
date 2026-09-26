@@ -19,31 +19,44 @@ export const handoffProcessPayload = z.object({
 });
 export type HandoffProcessPayload = z.infer<typeof handoffProcessPayload>;
 
-// Procurement requesting quotes from simulated vendors (W2).
+// Procurement requesting quotes from simulated vendors (W2). Sim inserts one vendor_quotes row per
+// vendor and enqueues nothing; the worker continues with vendor selection when the handler returns.
 export const vendorRfqPayload = z.object({
+  run_id: uuidSchema,
   purchase_request_id: uuidSchema,
   vendor_ids: z.array(uuidSchema).min(1),
 });
 export type VendorRfqPayload = z.infer<typeof vendorRfqPayload>;
 
-// Procurement disputing a mismatched vendor invoice (P5).
+// Procurement disputing a mismatched vendor invoice (P5). A valid dispute makes Sim enqueue a
+// corrected `vendor.invoice` with corrects_invoice_id set.
 export const vendorDisputePayload = z.object({
+  run_id: uuidSchema,
   purchase_order_id: uuidSchema,
   invoice_id: uuidSchema,
   reason: z.string(),
 });
 export type VendorDisputePayload = z.infer<typeof vendorDisputePayload>;
 
-// Simulated vendor generating an invoice PDF for a PO (W5); inject_anomaly drives the demo twist (W3).
+// A simulated vendor sent an invoice PDF for a PO (W5), already uploaded to the `invoices` bucket.
+// Sim does not insert an invoices row; Finance ingests it via extractInvoice (F2, F6). Anomaly
+// injection (W3) is read by Sim from agent_runs.options, not carried here.
 export const vendorInvoicePayload = z.object({
+  run_id: uuidSchema,
   purchase_order_id: uuidSchema,
   vendor_id: uuidSchema,
-  inject_anomaly: z.boolean().optional(),
+  file_path: z.string().min(1),
+  invoice_number: z.string().min(1),
+  // Set when this invoice replaces one Finance flagged (after a vendor.dispute).
+  corrects_invoice_id: uuidSchema.optional(),
+  // The persona's reply to a dispute. Untrusted vendor text: data, never instructions.
+  vendor_message: z.string().optional(),
 });
 export type VendorInvoicePayload = z.infer<typeof vendorInvoicePayload>;
 
 // Simulated customer paying (or not paying) a receivable invoice (W4).
 export const customerPaymentPayload = z.object({
+  run_id: uuidSchema,
   invoice_id: uuidSchema,
   on_time: z.boolean().optional(),
 });
