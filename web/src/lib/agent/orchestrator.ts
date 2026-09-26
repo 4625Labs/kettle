@@ -61,9 +61,23 @@ const routeTool = {
   }),
 };
 
-/** Asks the model to route an event, validates the choice, logs it. Returns the allowed route. */
-async function routeEvent(runId: string, event: EventType, summary: Record<string, unknown>): Promise<Route> {
+/**
+ * Asks the model to route an event, validates the choice, logs it. Returns the allowed route.
+ * `eventKey` identifies the event so a retried job reuses its earlier routing step.
+ */
+async function routeEvent(runId: string, event: EventType, eventKey: string, summary: Record<string, unknown>): Promise<Route> {
   const db = serviceDb();
+  const allowed = ROUTES[event];
+  const { data: prior } = await db
+    .from("agent_steps")
+    .select("id")
+    .eq("run_id", runId)
+    .eq("action", "route")
+    .eq("input->>event_key", eventKey)
+    .limit(1)
+    .maybeSingle();
+  if (prior) return allowed;
+
   const policies = await loadPolicies();
   const { count } = await db
     .from("agent_steps")
@@ -75,7 +89,6 @@ async function routeEvent(runId: string, event: EventType, summary: Record<strin
     throw new EscalationError(`step cap reached: ${count} routing decisions in this run (max_steps ${policies.maxSteps})`);
   }
 
-  const allowed = ROUTES[event];
   const d = await decide(
     [
       { role: "system", content: ORCHESTRATOR_SYSTEM },
@@ -96,7 +109,7 @@ async function routeEvent(runId: string, event: EventType, summary: Record<strin
     runId,
     agent: "orchestrator",
     action: "route",
-    input: { event, ...summary },
+    input: { event, event_key: eventKey, ...summary },
     output: {
       route: routeKey(allowed),
       to_agent: allowed.agent,
@@ -137,7 +150,7 @@ export async function processHandoff(handoffId: string) {
 
   await db.from("handoffs").update({ status: "processing" }).eq("id", handoffId).in("status", ["pending", "processing"]);
   const payload = parseHandoffPayload(type, h.payload);
-  const route = await routeEvent(runId, type, { handoff_id: handoffId, from: h.from_agent, to: h.to_agent, payload });
+  const route = await routeEvent(runId, type, `handoff:${handoffId}`, { handoff_id: handoffId, from: h.from_agent, to: h.to_agent, payload });
 
   switch (routeKey(route)) {
     case "procurement.handle_purchase_request":
@@ -172,7 +185,7 @@ export async function processHandoff(handoffId: string) {
 // --- External events -------------------------------------------------------------------------
 
 export async function onDealWon(runId: string, dealId: string) {
-  const route = await routeEvent(runId, "deal.won", { deal_id: dealId });
+  const route = await routeEvent(runId, "deal.won", `deal.won:${dealId}`, { deal_id: dealId });
   if (routeKey(route) !== "sales.validate_won_deal") throw new EscalationError("unexpected route for deal.won");
   const res = await sales.validateWonDeal(runId, dealId);
   if (!res.ok) throw new EscalationError(`deal ${dealId} failed validation`);
@@ -181,7 +194,7 @@ export async function onDealWon(runId: string, dealId: string) {
 export async function onVendorInvoice(job: VendorInvoicePayload) {
   const runId = job.run_id;
   const event: EventType = job.corrects_invoice_id ? "vendor_invoice.corrected" : "vendor_invoice.received";
-  const route = await routeEvent(runId, event, {
+  const route = await routeEvent(runId, event, `vendor.invoice:${job.file_path}`, {
     purchase_order_id: job.purchase_order_id,
     invoice_number: job.invoice_number,
     corrects_invoice_id: job.corrects_invoice_id,
