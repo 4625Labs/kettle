@@ -10,8 +10,8 @@ secrets/setup keys live in env files, never in this doc.
 | VM-C created | **done** (rebuilt once — see below) |
 | DNS records added and verified (`dig @1.1.1.1`) | **done** |
 | Dashboard reachable + admin created | dashboard reachable (done); admin account **not yet created** — waiting on the user to do this themselves in-browser |
-| VM-A peer | todo |
-| VM-B peer | todo |
+| VM-A peer | **done** |
+| VM-B peer | **done** |
 | Peer Expose enabled (account setting) | todo |
 | `kettle.4625labs.com` service active | todo |
 | Auth configured (SSO/password gating the service) | todo |
@@ -19,7 +19,8 @@ secrets/setup keys live in env files, never in this doc.
 | VM-A port scan clean (no public ports) | todo |
 | Per-run `netbird expose` working and expiring | todo |
 
-Overall: **2.5/11 done** (VM-C created, DNS verified, dashboard reachable but no admin yet).
+Overall: **4.5/11 done** (VM-C created, DNS verified, dashboard reachable but no admin yet, VM-A
+peer, VM-B peer).
 
 ## 2. Bonus scorecard
 
@@ -105,8 +106,8 @@ Nothing billable has been created yet — topology/cost plan is pending user app
 | VM-B public / private IP | `96.30.205.155` / `10.10.0.4` |
 | BigRock DNS records needed now | `A netbird.4625labs.com` → `144.202.22.122`; `CNAME *.netbird.4625labs.com` → `netbird.4625labs.com`; `CNAME kettle.4625labs.com` → `netbird.4625labs.com` (fallback `kettle.netbird.4625labs.com` if custom domain unsupported) |
 | Dashboard URL | `https://netbird.4625labs.com` (live, no admin account yet) |
-| VM-A peer name / IP | not yet — NetBird client not installed |
-| VM-B peer name / IP | not yet — NetBird client not installed |
+| VM-A peer name / IP | `kettle-app.netbird.selfhosted` / `100.75.158.87` (NetBird overlay) |
+| VM-B peer name / IP | `kettle-db.netbird.selfhosted` / `100.75.132.16` (NetBird overlay) |
 | `kettle.4625labs.com` service | not yet created |
 | Supabase API service name/URL | not yet created |
 | Auth method | not yet decided (SSO vs password) |

@@ -378,3 +378,27 @@ Same public IP confirmed unchanged: `96.30.205.155`.
 Next: generate fresh secrets on the box (Postgres password, JWT secret, anon/service-role keys,
 dashboard password), self-host Supabase via their official docker-compose, apply migrations +
 seed + demo users. Not started yet.
+
+---
+
+### 2026-09-26 — VM-A and VM-B joined as NetBird peers
+
+**What / why:** connect both app VMs to the self-hosted NetBird network so they can be reached
+(and later, expose services) without any public inbound ports.
+
+**Remote command (user gave the setup key directly in this session; never written to any file or
+log — redacted here as `$NETBIRD_SETUP_KEY`):**
+```
+# VM-A (already had the client from earlier)
+ssh (via VM-C jump host) root@10.10.0.3 "netbird up --setup-key '$NETBIRD_SETUP_KEY' \
+  --management-url https://netbird.4625labs.com"
+# VM-B (installed the client first, same as VM-A earlier: curl -fsSL
+# https://pkgs.netbird.io/install.sh | sh)
+ssh (via VM-C jump host) root@10.10.0.4 "netbird up --setup-key '$NETBIRD_SETUP_KEY' \
+  --management-url https://netbird.4625labs.com"
+```
+**Result:** both connected. `netbird status` on each: Management Connected, Signal Connected,
+Relays 2/2 Available. VM-A → FQDN `kettle-app.netbird.selfhosted`, NetBird IP `100.75.158.87/16`.
+VM-B → FQDN `kettle-db.netbird.selfhosted`, NetBird IP `100.75.132.16/16`. Both showed "Peers
+count: 0/0" right after connecting (mesh discovery/policy propagation; expected to settle shortly).
+**Cost impact:** none.
