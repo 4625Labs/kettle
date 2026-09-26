@@ -1,15 +1,14 @@
 import { requireSession } from "@/app/_lib/session";
-import { RunView } from "@/components/run/RunView";
 import { RunViewLoading, RunViewError } from "@/components/run/RunViewStates";
+import { LiveRunView } from "./_lib/LiveRunView";
+import { getLatestRun } from "./_lib/data";
 import { MOCK_TIMELINE } from "./_mock/data";
+import { RunView } from "@/components/run/RunView";
 
-// `?state=loading|error|empty` is a phase-1-only preview hook for states that
-// have no real trigger yet (nothing async, no run can fail). Drop it once
-// phase 2 wires a real fetch + Realtime subscription with genuine loading/
-// error conditions.
-export default async function RunPage({
-  searchParams,
-}: PageProps<"/run">) {
+// `?state=loading|error|mock` previews states that have no real trigger in
+// this demo (nothing here can actually fail to load) or shows the original
+// mock golden path for design review — never used by the live control bar.
+export default async function RunPage({ searchParams }: PageProps<"/run">) {
   await requireSession();
   const { state } = await searchParams;
 
@@ -19,6 +18,17 @@ export default async function RunPage({
       <RunViewError message="Couldn't load this run. Check the worker is running and reload." />
     );
   }
+  if (state === "mock") return <RunView timeline={MOCK_TIMELINE} />;
 
-  return <RunView timeline={state === "empty" ? [] : MOCK_TIMELINE} />;
+  const latest = await getLatestRun();
+
+  return (
+    <LiveRunView
+      key={latest?.runId ?? "empty"}
+      initialRunId={latest?.runId ?? null}
+      initialSteps={latest?.steps ?? []}
+      initialHandoffs={latest?.handoffs ?? []}
+      initialApprovals={latest?.approvals ?? []}
+    />
+  );
 }
