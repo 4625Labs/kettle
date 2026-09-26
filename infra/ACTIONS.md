@@ -402,3 +402,32 @@ Relays 2/2 Available. VM-A → FQDN `kettle-app.netbird.selfhosted`, NetBird IP 
 VM-B → FQDN `kettle-db.netbird.selfhosted`, NetBird IP `100.75.132.16/16`. Both showed "Peers
 count: 0/0" right after connecting (mesh discovery/policy propagation; expected to settle shortly).
 **Cost impact:** none.
+
+---
+
+### 2026-09-26 — Fixed the agent-network dashboard/proxy restriction
+
+**Remote (user approved directly in-session; classifier had blocked the relayed version under
+"Remote Shell Writes"):**
+```
+ssh root@144.202.22.122 "
+  cp /root/dashboard.env /root/dashboard.env.bak
+  cp /root/proxy.env /root/proxy.env.bak
+  sed -i '/^NETBIRD_AGENT_NETWORK_ONLY=true$/d' /root/dashboard.env
+  sed -i '/^NB_PROXY_PRIVATE=true$/d' /root/proxy.env
+  cd /root && docker compose up -d dashboard proxy
+"
+```
+**Result:** only `netbird-dashboard` and `netbird-proxy` recreated; `netbird-server` and
+`netbird-traefik` untouched (confirmed via `docker ps` — their uptime didn't reset), so the
+`netbird_data` volume (IdP/accounts) was never touched. Verified inside the running containers:
+`docker exec netbird-dashboard printenv | grep AGENT_NETWORK` → empty (was `true`).
+`docker exec netbird-proxy printenv | grep PROXY_PRIVATE` → empty (was `true`). Proxy's own
+startup log now explicitly says `private: false` on its main listener (was implicitly `true`
+before). Backups kept at `/root/dashboard.env.bak` and `/root/proxy.env.bak` on VM-C.
+
+**Not independently verified:** the dashboard's Peers/Setup Keys/Reverse-Proxy nav pages
+specifically — that requires a logged-in session, and no admin account exists yet (intentionally,
+so this agent never sees the credential). The env removal is the *complete and only* mechanism
+the preset used to hide those pages (confirmed by reading the script source), so this should be
+resolved, but the user should confirm visually once they log in.
