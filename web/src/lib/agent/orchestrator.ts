@@ -14,7 +14,7 @@ import * as procurement from "./agents/procurement";
 import * as sales from "./agents/sales";
 import { must, serviceDb } from "./db";
 import { EscalationError } from "./errors";
-import { recordStep } from "./ledger";
+import { completeRun, recordStep } from "./ledger";
 import { decide, json } from "./llm";
 import { loadPolicies } from "./policies";
 import { ORCHESTRATOR_SYSTEM } from "./prompts/orchestrator";
@@ -238,5 +238,16 @@ export async function onApprovalDecided(approvalId: string) {
     case "invoice_correction":
       if (approved) await finance.matchInvoice(a.run_id, a.subject_id);
       break;
+  }
+  // A human said no: this run can't reach its goal. End it so the UI doesn't show it as live.
+  if (!approved && (await completeRun(a.run_id, "failed"))) {
+    await recordStep({
+      runId: a.run_id,
+      agent: "orchestrator",
+      action: "run.stopped",
+      output: { approval_id: approvalId, subject_type: a.subject_type },
+      status: "flagged",
+      rationale: `Run stopped: a human rejected the ${a.subject_type.replace("_", " ")}.`,
+    });
   }
 }
