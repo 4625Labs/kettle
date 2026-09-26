@@ -32,18 +32,15 @@ services:
         max-file: "3"
 
   worker:
-    image: kettle-web:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    image: kettle-worker:latest
     restart: unless-stopped
     env_file:
       - .env
-    # Placeholder heartbeat until the agents-core agent lands worker/dist/index.js.
-    # Replace with: command: ["node", "worker/dist/index.js"]
-    command:
-      [
-        "node",
-        "-e",
-        "setInterval(() => console.log('worker placeholder heartbeat'), 30000)",
-      ]
+    stop_grace_period: 60s
     logging:
       driver: json-file
       options:

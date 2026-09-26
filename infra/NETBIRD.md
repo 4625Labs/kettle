@@ -7,27 +7,27 @@ secrets/setup keys live in env files, never in this doc.
 
 | Item | Status |
 |---|---|
-| VM-C created | **done** |
-| DNS records added and verified (`dig @1.1.1.1`) | todo — blocked on user adding BigRock records |
-| Dashboard reachable + admin created | todo |
-| VM-A peer | todo |
-| VM-B peer | todo |
-| Peer Expose enabled (account setting) | todo |
-| `kettle.4625labs.com` service active | todo |
-| Auth configured (SSO/password gating the service) | todo |
-| Supabase API service active | todo |
+| VM-C created | **done** (rebuilt once — see below) |
+| DNS records added and verified (`dig @1.1.1.1`) | **done** |
+| Dashboard reachable + admin created | **done** — user confirmed admin account works, Peers shows kettle-app and kettle-db |
+| VM-A peer | **done** |
+| VM-B peer | **done** |
+| Peer Expose enabled (account setting) | **done** — user confirmed |
+| `kettle.4625labs.com` service active | user created it; **blocked** — see below, not yet reachable |
+| Auth configured (SSO/password gating the service) | done as part of service creation (not independently verified — service itself isn't reachable yet) |
+| Supabase API service active | user created it; **blocked** — same root cause |
 | VM-A port scan clean (no public ports) | todo |
 | Per-run `netbird expose` working and expiring | todo |
 
-Overall: **1/11 done.**
+Overall: **6/11 done**, but **2 new blockers found** verifying the services — see below.
 
 ## 2. Bonus scorecard
 
 | Criterion | Evidence |
 |---|---|
-| No open ports (VM-A) | not yet — pending port scan after firewall + NetBird client setup |
-| Gated access | not yet — pending service auth config |
-| Lifecycle-bound URLs | not yet — pending worker integration of `netbird expose` |
+| No open ports (VM-A) | not yet — pending NetBird client + peer setup on VM-A |
+| Gated access | not yet — dashboard is live at `https://netbird.4625labs.com` (`200`, valid Let's Encrypt cert) but no admin user exists yet; pending service auth config |
+| Lifecycle-bound URLs | not yet — pending worker integration of `netbird expose` (NetBird Proxy component is running, confirmed via `docker ps`) |
 
 ## 3. What was done
 
@@ -68,6 +68,60 @@ Nothing billable has been created yet — topology/cost plan is pending user app
   then this agent can verify with `dig @1.1.1.1` from a VM and open the dashboard to create the
   admin account.
 
+### 2026-09-26 — Marketplace image never worked; rebuilt VM-C on plain Ubuntu + real NetBird install
+- DNS was added by the user and initially looked fine externally, but VM-C itself never answered
+  any connection (22/80/443 all "connection refused" for 30+ minutes). Console access revealed the
+  marketplace image's default account is `linuxuser` (not `root`), our SSH key never reached it,
+  and login failed even with the dashboard password — the image itself was broken, not just a
+  wrong-account issue.
+- Decision (user-approved): abandon the marketplace image. `PATCH`'d the same instance to plain
+  Ubuntu 24.04 (`os_id 2284`, same as VM-A) with cloud-init that installs our SSH key for root and
+  pre-installs Docker/jq. **Same public IP preserved (`144.202.22.122`)** — no DNS re-work needed.
+- Ran NetBird's own official self-hosted installer (`getting-started.sh` from
+  `github.com/netbirdio/netbird` releases) directly over SSH, non-interactively
+  (`NETBIRD_NON_INTERACTIVE=true NETBIRD_AGENT_NETWORK=true NETBIRD_DOMAIN=netbird.4625labs.com
+  NETBIRD_LETSENCRYPT_EMAIL=<user-provided, LE-only, not recorded here>`). This is NetBird's
+  built-in unattended-install preset — bypasses every prompt, uses the built-in Traefik reverse
+  proxy, and enables the NetBird Proxy component (needed later for `netbird expose` / N4).
+- **Result:** 4 containers running (`netbird-server`, `netbird-dashboard`, `netbird-traefik`,
+  `netbird-proxy`), `https://netbird.4625labs.com` → `200`, valid Let's Encrypt cert
+  (`CN=netbird.4625labs.com`, valid through Dec 25 2026). `dig @1.1.1.1` **run from VM-C itself**
+  (not the venue network) confirms `netbird.4625labs.com`, `*.netbird.4625labs.com`, and
+  `kettle.4625labs.com` all resolve to `144.202.22.122`.
+- **Decided: keep `51820/udp` closed.** The installer publishes it for optional direct P2P proxy
+  connections, but relay-only over 443/3478 is fine for our purposes and keeps the attack surface
+  smaller. No firewall rule added for it (decision, not just a pending flag).
+- **Not yet done:** no admin account exists on the dashboard yet. Per the plan, the user should
+  create this themselves in-browser (never generated or seen by this agent) — see next report for
+  exact first-login steps once relayed.
+
+### 2026-09-26 — Admin account, Peer Expose, two services all created — but neither service works yet
+- User confirmed: admin account works, Peers page shows `kettle-app` and `kettle-db`, Peer Expose
+  is enabled, and both reverse-proxy services exist: `kettle.4625labs.com` → `kettle-app:3000`,
+  `api.netbird.4625labs.com` → `kettle-db:8000`.
+- Verification (from VM-C): `curl -sI https://kettle.4625labs.com` and `curl -s
+  https://api.netbird.4625labs.com/auth/v1/health` — **both time out** (no response, not even a
+  clean 502/401). DNS resolves correctly for both (`dig @1.1.1.1` → `144.202.22.122`).
+- **Root cause found:** `netbird status` on **both VM-A and VM-B shows "Peers count: 0/1
+  Connected"** — each VM is connected to Management/Signal fine, but has **no working
+  peer-to-peer/relay connection to the other peer** (or to the proxy component's routing). The
+  proxy's own logs (`docker logs netbird-proxy` on VM-C) show it repeatedly trying and failing to
+  reach `kettle-db`'s NetBird IP (`100.75.132.16:8000`) — requests hang rather than failing
+  cleanly, consistent with a broken/blocked overlay path, not just "nothing deployed yet."
+- **Likely cause (not yet confirmed):** a missing or misconfigured Access Control policy in the
+  NetBird dashboard. Self-hosted NetBird doesn't always ship a default "allow all peers" policy —
+  if none exists (or a default-deny policy is in effect), peers can register with Management but
+  never establish an actual data path to each other or to the proxy. This is dashboard/account
+  configuration territory this agent doesn't have credentials for.
+- **Needs from the user:** check **Access Control / Policies** in the dashboard — confirm a policy
+  exists that allows the reverse-proxy service to reach `kettle-app`/`kettle-db` (and ideally that
+  `kettle-app`/`kettle-db` can reach each other, for later VM-A ↔ VM-B traffic). If no policy
+  exists, create one (a broad "Allow all peers" default policy is the simplest fix for now, suitable
+  for a single-tenant demo like this).
+- Ruled out as the cause: DNS (correct), the services themselves (both created correctly per the
+  user), firewall (irrelevant — this is all internal NetBird overlay routing, not the Vultr cloud
+  firewall).
+
 ## 4. Values
 
 | Item | Value |
@@ -77,8 +131,10 @@ Nothing billable has been created yet — topology/cost plan is pending user app
 | VM-A public / private IP | `64.177.51.161` / `10.10.0.3` |
 | VM-B public / private IP | `96.30.205.155` / `10.10.0.4` |
 | BigRock DNS records needed now | `A netbird.4625labs.com` → `144.202.22.122`; `CNAME *.netbird.4625labs.com` → `netbird.4625labs.com`; `CNAME kettle.4625labs.com` → `netbird.4625labs.com` (fallback `kettle.netbird.4625labs.com` if custom domain unsupported) |
-| VM-A peer name / IP | not yet — NetBird client not installed |
-| VM-B peer name / IP | not yet — NetBird client not installed |
+| Dashboard URL | `https://netbird.4625labs.com` (live, no admin account yet) |
+| VM-A peer name / IP | `kettle-app.netbird.selfhosted` / `100.75.158.87` (NetBird overlay) |
+| VM-B peer name / IP | `kettle-db.netbird.selfhosted` / `100.75.132.16` (NetBird overlay) |
 | `kettle.4625labs.com` service | not yet created |
-| Supabase API service name/URL | not yet created |
+| Supabase API service name/URL | not yet created — plan: `api.netbird.4625labs.com` → VM-B peer `:8000` (Envoy gateway, confirmed listening) |
 | Auth method | not yet decided (SSO vs password) |
+| Supabase gateway (VM-B) | `http://10.10.0.4:8000` — 11/11 containers healthy, confirmed reachable from VM-A over the VPC |
