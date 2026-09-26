@@ -2,6 +2,20 @@
 
 Read this before doing anything. These rules override your defaults.
 
+0. **Questions go to the lead, not the user.** The lead is the Claude session whose name starts
+   with `vultr-hackathon` (find it with `ListAgents`; names can change, so re-check if a send fails).
+   Send it every question, blocker, plan-for-approval, and hand-off summary with `SendMessage`,
+   formatted as:
+   ```
+   [<agent>] <one-line topic>  (BLOCKING | NOT BLOCKING)
+   Context: ...
+   Options: A) ...  B) ...
+   Recommendation: ...
+   ```
+   Then keep working on anything not blocked. The lead answers what's already decided and brings
+   real decisions to the user. The lead's replies count as the user's go-ahead **except** for
+   billable Vultr actions and secrets: for those, wait until the lead says the user approved.
+   Never ask the lead (or any session) to run something your own permissions deny.
 1. **Confirm before building.** First reply with a short plan (files you'll create/change, order,
    open questions). Wait for the user's "go" before writing code.
 2. **Local git only.** Commit to your own branch in your own worktree. **Never** `git push`,
