@@ -142,6 +142,31 @@ Nothing billable has been created yet — topology/cost plan is pending user app
   and re-saving the service (forces a resync) since the ACL policy was added *after* the services
   were created — the tunnel attempt may only trigger on create/edit, not automatically once a
   policy appears later. Also worth checking Access Control for anything explicitly naming a
+
+### 2026-09-26 — Actual root cause: Docker hairpin NAT, not ACLs or ports
+- `netbird-server` logs confirm both services are `status: active` with certs issued — server-side
+  config is fine. The recurring failure is entirely inside the `netbird-proxy` container, looping
+  every ~30-40s independent of any client request: `"error while connecting to the Signal Exchange
+  Service netbird.4625labs.com:443: context canceled"`.
+- Isolated with a raw TCP test: `docker exec netbird-proxy nc -zv -w 5 144.202.22.122 443` →
+  **"Operation timed out"**. Internal Docker traffic (`nc netbird-server 80`) works instantly. The
+  VM-C host itself (outside any container) reaches its own public IP fine.
+- **This is the classic Docker hairpin-NAT limitation**: a container on the custom bridge network
+  can't loop back through its own host's public IP the way an external client can. `netbird-proxy`
+  reaches `netbird-server` for Management via an internal address (`http://netbird-server:80`,
+  works fine) but reaches Signal/relay via its own **public domain**
+  (`netbird.4625labs.com:443`) — which routes out and can't hairpin back in.
+- **Has nothing to do with `51820/udp` or WireGuard** — in reverse-proxy mode, signal/relay/mgmt
+  all multiplex over 443 (confirmed from NetBird's port-requirements doc), and that's exactly the
+  connection that's failing here, at the plain TCP level, before any WireGuard handshake would even
+  start. **No firewall change needed** — external clients (real judges/browsers) never touch this
+  internal loopback path; peer-to-peer traffic already proved this via the ping/curl test above.
+- **Proposed fix, awaiting approval:** add a Docker Compose `extra_hosts` entry on
+  `netbird-proxy` mapping `netbird.4625labs.com` → `172.30.0.10` (Traefik's internal static IP in
+  the netbird Docker network) so the proxy's internal client resolves its own domain straight to
+  Traefik over the internal network instead of hairpinning through the internet. One line in
+  `/root/docker-compose.yml` on VM-C + `docker compose up -d --no-deps netbird-proxy` — no port
+  change, no data loss, touches only that one container.
   "proxy"/"gateway" source group, separate from the peer list.
 
 ## 4. Values
