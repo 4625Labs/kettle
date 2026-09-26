@@ -56,25 +56,25 @@ the agent's starting prompt:
 
 # Infra (Sonnet)
 cd /Users/4625labs/Workspace/Hackathons/vultr-hackathon && scripts/new-agent-worktree.sh infra
-cd ../kettle-wt/infra && claude --model sonnet "$(cat docs/agents/infra.md)"
+cd ../kettle-wt/infra && claude --model sonnet --permission-mode acceptEdits "$(cat docs/agents/infra.md)"
 
 # Data (Sonnet)
 cd /Users/4625labs/Workspace/Hackathons/vultr-hackathon && scripts/new-agent-worktree.sh data
-cd ../kettle-wt/data && claude --model sonnet "$(cat docs/agents/data.md)"
+cd ../kettle-wt/data && claude --model sonnet --permission-mode acceptEdits "$(cat docs/agents/data.md)"
 
 # Frontend (Sonnet): dev server on port 3001
 cd /Users/4625labs/Workspace/Hackathons/vultr-hackathon && scripts/new-agent-worktree.sh frontend
-cd ../kettle-wt/frontend && claude --model sonnet "$(cat docs/agents/frontend.md) Use port 3001 for your dev server (npm run dev -- -p 3001)."
+cd ../kettle-wt/frontend && claude --model sonnet --permission-mode acceptEdits "$(cat docs/agents/frontend.md) Use port 3001 for your dev server (npm run dev -- -p 3001)."
 
 # ---- Wave 2 (after agent/data is merged into main) ----
 
 # Agents-core (Opus): dev server on port 3002
 cd /Users/4625labs/Workspace/Hackathons/vultr-hackathon && scripts/new-agent-worktree.sh agents-core
-cd ../kettle-wt/agents-core && claude --model opus "$(cat docs/agents/agents-core.md) Use port 3002 if you run the dev server."
+cd ../kettle-wt/agents-core && claude --model opus --permission-mode acceptEdits "$(cat docs/agents/agents-core.md) Use port 3002 if you run the dev server."
 
 # Sim-world (Sonnet): dev server on port 3003
 cd /Users/4625labs/Workspace/Hackathons/vultr-hackathon && scripts/new-agent-worktree.sh simworld
-cd ../kettle-wt/simworld && claude --model sonnet "$(cat docs/agents/simworld.md) Use port 3003 if you run the dev server."
+cd ../kettle-wt/simworld && claude --model sonnet --permission-mode acceptEdits "$(cat docs/agents/simworld.md) Use port 3003 if you run the dev server."
 
 # Frontend phase 2: in the existing frontend terminal, tell the agent:
 #   "Data contracts are merged. Run git merge main, then start Phase 2."
@@ -83,7 +83,7 @@ cd ../kettle-wt/simworld && claude --model sonnet "$(cat docs/agents/simworld.md
 
 # QA & docs (Haiku): dev server on port 3004
 cd /Users/4625labs/Workspace/Hackathons/vultr-hackathon && scripts/new-agent-worktree.sh qa-docs
-cd ../kettle-wt/qa-docs && claude --model haiku "$(cat docs/agents/qa-docs.md) Use port 3004 if you run the dev server."
+cd ../kettle-wt/qa-docs && claude --model haiku --permission-mode acceptEdits "$(cat docs/agents/qa-docs.md) Use port 3004 if you run the dev server."
 ```
 
 ## Only the lead pushes and merges
@@ -99,8 +99,9 @@ Enforced in three layers, tested on 2026-09-26:
 Agents can still commit to their own branch and run `git merge main` to bring updates in.
 The lead checkout isn't affected by any of these.
 
-Optional: add `--permission-mode acceptEdits` to let an agent edit files inside its worktree without
-asking each time. Shell commands still prompt you.
+`--permission-mode acceptEdits` lets an agent edit files in its worktree without asking; shell commands
+still prompt in its terminal. Questions and decisions go to the lead session (ground rule 0), which
+brings you only what needs your decision.
 
 ## Merge loop (lead session)
 

@@ -1,69 +1,81 @@
-import Image from "next/image";
+import Link from "next/link";
+import { getSession } from "@/app/_lib/session";
 
-export default function Home() {
+const STEPS = [
+  {
+    agent: "sales",
+    label: "Sales",
+    detail: "Deal marked won — validated, handed off.",
+  },
+  {
+    agent: "procurement",
+    label: "Procurement",
+    detail: "RFQs, vendor scoring, PO issued.",
+  },
+  {
+    agent: "finance",
+    label: "Finance",
+    detail: "Invoices matched, payment scheduled.",
+  },
+] as const;
+
+export default async function LandingPage() {
+  const session = await getSession();
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="flex flex-1 flex-col items-center px-6 py-20">
+      <div className="flex max-w-2xl flex-col items-center text-center">
+        <span className="rounded-full border border-border px-3 py-1 text-xs font-medium uppercase tracking-wide text-foreground/60">
+          Vultr Agent Arena · Future of Work
+        </span>
+        <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">
+          One deal. Three agents. One ledger.
+        </h1>
+        <p className="mt-4 text-lg leading-8 text-foreground/70">
+          Kettle is a flock of AI agents — Sales, Procurement, and Finance — that
+          run an enterprise&apos;s back office together. They hand work to each
+          other, push back when something doesn&apos;t add up, and stop for a
+          human on anything that moves money. Every action is executed and
+          visible live, not a described plan.
+        </p>
+
+        <Link
+          href={session ? "/run" : "/login"}
+          className="mt-8 rounded-md bg-foreground px-6 py-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
+        >
+          {session ? "Watch the run" : "Sign in to watch a run"}
+        </Link>
+      </div>
+
+      <div className="mt-16 grid w-full max-w-4xl grid-cols-1 gap-4 sm:grid-cols-3">
+        {STEPS.map((step, i) => (
+          <div
+            key={step.agent}
+            className="relative rounded-xl border border-border bg-surface p-5"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+            <span
+              className="mb-3 inline-block h-2.5 w-2.5 rounded-full"
+              style={{ background: `var(--agent-${step.agent})` }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+            <h2 className="font-semibold">{step.label}</h2>
+            <p className="mt-1 text-sm text-foreground/60">{step.detail}</p>
+            {i < STEPS.length - 1 && (
+              <span
+                aria-hidden
+                className="absolute top-1/2 -right-4 hidden -translate-y-1/2 text-lg text-foreground/30 sm:block"
+              >
+                →
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-6 max-w-md text-center text-sm text-foreground/50">
+        The twist: a vendor invoice comes in over quote. Finance flags it,
+        hands it back to Procurement, and all three lanes light up resolving it
+        — live.
+      </p>
     </div>
   );
 }
