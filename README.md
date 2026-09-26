@@ -1,10 +1,14 @@
-# Back-Office Agent Platform
+# Kettle
 
-Vultr Agent Arena Hackathon 2026 — Challenge 2 (Future of Work).
+> *A kettle is a flock of vultures circling together.*
 
-An agent that plans and executes real back-office work across **sales, procurement,
-and finance** against one shared ledger, with every action it takes recorded in a
-live, auditable execution trail — not a static dashboard.
+Kettle is a flock of AI agents (**Sales**, **Procurement**, and **Finance**) that run an
+enterprise's back office together on Vultr. They share one ledger, hand work to each other,
+push back when something doesn't add up, and stop for a human on anything that moves money.
+Every action is recorded in a live, auditable execution trail, not a static dashboard.
+
+Vultr Agent Arena Hackathon 2026, Challenge 2 (Future of Work). Live at
+`https://kettle.4625labs.com` (coming soon). Requirements: [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
 
 ## Workflow
 
