@@ -3,11 +3,29 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --surface: #f4f4f5;
+  --border: #e4e4e7;
+
+  /* Agent colors — consistent everywhere a step/lane/badge refers to an agent. */
+  --agent-sales: #2563eb;
+  --agent-procurement: #7c3aed;
+  --agent-finance: #059669;
+  --agent-orchestrator: #64748b;
+  --anomaly: #d97706;
+  --resolved: #16a34a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-agent-sales: var(--agent-sales);
+  --color-agent-procurement: var(--agent-procurement);
+  --color-agent-finance: var(--agent-finance);
+  --color-agent-orchestrator: var(--agent-orchestrator);
+  --color-anomaly: var(--anomaly);
+  --color-resolved: var(--resolved);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -16,6 +34,15 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --surface: #18181b;
+    --border: #27272a;
+
+    --agent-sales: #60a5fa;
+    --agent-procurement: #a78bfa;
+    --agent-finance: #34d399;
+    --agent-orchestrator: #94a3b8;
+    --anomaly: #fbbf24;
+    --resolved: #4ade80;
   }
 }
 
@@ -23,4 +50,26 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
