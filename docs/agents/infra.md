@@ -13,14 +13,34 @@ app VM** and the app served through self-hosted NetBird.
 `infra/**`, `web/Dockerfile`, `web/.dockerignore`, `web/docker-compose.yml`,
 `web/src/app/api/health/route.ts`.
 
+## Keep the user informed (required)
+- Use **only** `VULTR_API_KEY` from `web/.env.local` (sub-user: provisioning, subscriptions, firewall).
+  Never use `VULTR_ADMIN_KEY`.
+- Append **every** Vultr API call and every remote command to `infra/ACTIONS.md` as you go:
+  timestamp, what and why, the exact call with secrets replaced by `$VAR` names, the result
+  (resource id, IP, status), and cost impact.
+- After **each** step, post a short plain-English report to the user: what you did, what it
+  created or changed, cost, what's next. Then wait for their go-ahead before the next billable step.
+
+## Fixed decisions
+- Public URL: `https://kettle.4625labs.com`. NetBird dashboard: `netbird.4625labs.com`.
+  Per-run URLs: `*.netbird.4625labs.com`. DNS is at **BigRock**; you can't change it. Give the user
+  the exact records to add (see REQUIREMENTS §14) and verify them with `dig @1.1.1.1` from a VM,
+  because the venue network appears to intercept DNS.
+- **Nothing is installed on the user's laptop.** No local NetBird client. Reach VM-A/VM-B by SSH
+  through **VM-C as a jump host** over the VPC (`ssh -J root@<vm-c> root@<vm-a-private-ip>`).
+  VM-A/VM-B firewalls allow SSH only from the VPC subnet; they have no public inbound rules.
+- Check NetBird's current docs on custom domains for `kettle.4625labs.com`. If it isn't supported,
+  fall back to `kettle.netbird.4625labs.com` and tell the user.
+
 ## Tasks (in order)
 1. Topology plan: regions, plans, estimated hourly/monthly cost for VM-A, VM-B (Supabase
    marketplace), VM-C (NetBird marketplace), VPC, firewall groups. Must fit the $200 credit through
    Sun 5 PM. **Present it and wait for approval.**
 2. After approval, guide or execute provisioning step by step (ask before each billable action).
    The user may prefer clicking in the Vultr console — then give exact click paths and record them.
-3. NetBird: DNS records (the user supplies the domain), VM-C setup, peers on VM-A and VM-B, Peer
-   Expose enabled, persistent HTTP service `kettle.<netbird-domain>` → VM-A:3000 with gated auth,
+3. NetBird: give the user the BigRock DNS records, set up VM-C, add peers on VM-A and VM-B, enable
+   Peer Expose, create a persistent HTTP service `kettle.4625labs.com` → VM-A:3000 with gated auth,
    and a Supabase API service → VM-B gateway.
 4. Containerize: multi-stage `web/Dockerfile`, `web/docker-compose.yml` (services `web` bound to
    127.0.0.1:3000 and `worker` with no ports; the worker entrypoint will be `node worker/dist/index.js`
@@ -35,4 +55,6 @@ app VM** and the app served through self-hosted NetBird.
 - A second deploy using `docs/skills/deploy-to-vultr.md` works in < 5 minutes.
 
 ## You need from the user
-Vultr access (API key in env or console), the domain for NetBird DNS, and approvals.
+Approvals for each billable step, and the BigRock DNS records (they add them). Start by confirming
+`VULTR_API_KEY` works with a read-only `GET /v2/account`. If it returns `Unauthorized IP address`,
+ask the user to add your current IP to the sub-user's API access control in the Vultr console.

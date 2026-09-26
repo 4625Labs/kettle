@@ -233,8 +233,17 @@ To add:
 | **VM-C** NetBird self-hosted (Vultr marketplace: Traefik, reverse proxy, CrowdSec), shared CPU ≥ 2 GB | Vultr cloud compute | The only public box: 443/80 + NetBird relay ports |
 | Vultr Serverless Inference | Managed | API key in server env only |
 
-Needs a **domain we control**: `A netbird.<domain>` → VM-C, `CNAME *.netbird.<domain>` → `netbird.<domain>`
-(DNS-only, not Cloudflare-proxied). NetBird reverse proxy is **beta**; `netbird expose` sessions are
+**Public URL: `https://kettle.4625labs.com`.** Domain `4625labs.com` is registered at BigRock (DNS on
+BigRock nameservers). Records, added by the user in the BigRock panel once VM-C's IP is known:
+
+| Record | Value | Purpose |
+|---|---|---|
+| `A netbird.4625labs.com` | VM-C public IP | NetBird dashboard + management |
+| `CNAME *.netbird.4625labs.com` | `netbird.4625labs.com` | Reverse-proxy services and per-run URLs (`run-xxxx.netbird.4625labs.com`) |
+| `CNAME kettle.4625labs.com` | `netbird.4625labs.com` | Custom domain for the Kettle app service (fallback: `kettle.netbird.4625labs.com`) |
+
+**No NetBird on the developer's laptop.** Admin access to VM-A/VM-B is SSH via VM-C as a jump host over
+the VPC; VM-A/VM-B accept SSH only from the VPC subnet. NetBird reverse proxy is **beta**; `netbird expose` sessions are
 ephemeral (90 s TTL, renewed every 30 s) with a limit of 10 per peer, and require "Peer Expose" to be
 enabled in account settings.
 
@@ -249,8 +258,13 @@ enabled in account settings.
 
 At listed prices, a full golden-path run (~40 calls) costs well under $0.10.
 
-## 15. Open items
+## 15. Credentials & open items
 
-1. **Domain** for NetBird DNS — which domain/registrar?
-2. **Vultr Serverless Inference API key** → `web/.env.local` (never in chat or git) to benchmark models.
-3. **Vultr API key** for the infra agent (or you create VMs in the console yourself).
+`web/.env.local` (gitignored) holds:
+- `VULTR_INFERENCE_API_KEY`: Serverless Inference subscription `kettle` (created 2026-09-26, verified working).
+- `VULTR_API_KEY`: sub-user **kettle-agent@4625labs.com**, ACLs `provisioning, subscriptions, subscriptions_view, firewall` only. No billing, users, or DNS. Key expires 2027-09-26.
+- `VULTR_ADMIN_KEY`: account root key. **The user removes this themselves**; agents must not use it.
+
+Open:
+1. Sub-user key needs the current IP added to its **API access control** in the Vultr console (it returns `Unauthorized IP address` until then).
+2. Confirm NetBird supports the custom domain `kettle.4625labs.com` for a dashboard service; else use `kettle.netbird.4625labs.com`.

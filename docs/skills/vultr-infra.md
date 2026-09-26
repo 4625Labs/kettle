@@ -11,6 +11,11 @@ description: Provision and manage Kettle's Vultr infrastructure — cloud comput
 - **VM-C** `kettle-netbird`: Vultr **NetBird** marketplace app, shared CPU ≥ 2 GB. Public 443/80 + NetBird relay ports.
 - All three in the **same region** (prefer one close to the inference datacenter, `atl`) and attached to one **VPC**.
 
+## Access
+- API: `VULTR_API_KEY` only (sub-user `kettle-agent@4625labs.com`: provisioning, subscriptions, firewall). Never `VULTR_ADMIN_KEY`.
+- Admin SSH: laptop → VM-C (public) → VM-A/VM-B over the VPC (`ProxyJump`). VM-A/VM-B firewall: SSH from the VPC subnet only; no public inbound rules.
+- Log every API call and remote command to `infra/ACTIONS.md`, and report to the user after each step.
+
 ## Safety rules (non-negotiable)
 - **Ask the user before** creating, resizing, or destroying any billable resource, and before changing firewall rules. Show the exact command or API call and its estimated monthly cost first.
 - Never print, log, or commit API keys, root passwords, or `.env` contents. Refer to them by variable name.

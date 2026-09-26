@@ -23,7 +23,7 @@ description: Package and run Kettle on a Vultr Ubuntu VM — Docker Compose for 
 
 ## Deploy flow (becomes the `deploy-to-vultr` skill)
 1. Local: `npm run build` and tests pass on the commit being deployed.
-2. Ship code: `rsync` the repo (or `git archive <sha>`) to VM-A over NetBird SSH/WireGuard — no GitHub dependency required.
+2. Ship code: `git archive <sha>` (or `rsync`) to VM-A over SSH via the VM-C jump host. No GitHub dependency and no NetBird on the laptop.
 3. On VM-A: `docker compose build && docker compose up -d`.
 4. Run DB migrations against VM-B from VM-A.
 5. Smoke test through the public NetBird URL.
