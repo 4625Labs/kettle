@@ -1,5 +1,9 @@
 # Kettle build agents
 
+> **Current status and what's pending: [`../STATUS.md`](../STATUS.md).** Waves 1–2 are complete and
+> merged (infra, data, frontend phase 1, agents-core, simworld). Frontend phase 2 and Infra's
+> deploy are in flight. QA & docs (wave 3) hasn't started.
+
 One **lead** session (Opus, the main repo checkout) plus up to **six build agents**, each in its own
 git worktree and branch. The lead reviews and merges locally. Nothing is pushed.
 

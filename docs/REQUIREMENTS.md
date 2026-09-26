@@ -265,6 +265,6 @@ At listed prices, a full golden-path run (~40 calls) costs well under $0.10.
 - `VULTR_API_KEY`: sub-user **kettle-agent@4625labs.com**, ACLs `provisioning, subscriptions, subscriptions_view, firewall` only. No billing, users, or DNS. Key expires 2027-09-26.
 - `VULTR_ADMIN_KEY`: account root key. **The user removes this themselves**; agents must not use it.
 
-Open:
-1. Sub-user key needs the current IP added to its **API access control** in the Vultr console (it returns `Unauthorized IP address` until then).
-2. Confirm NetBird supports the custom domain `kettle.4625labs.com` for a dashboard service; else use `kettle.netbird.4625labs.com`.
+Resolved: the sub-user key's IP allowlist is set (12.94.170.82/32), and the custom domain
+`kettle.4625labs.com` works in NetBird. The admin key was removed by the user. Live status is in
+[`STATUS.md`](STATUS.md).
