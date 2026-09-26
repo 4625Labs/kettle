@@ -615,3 +615,45 @@ specifically — that requires a logged-in session, and no admin account exists 
 so this agent never sees the credential). The env removal is the *complete and only* mechanism
 the preset used to hide those pages (confirmed by reading the script source), so this should be
 resolved, but the user should confirm visually once they log in.
+
+---
+
+### 2026-09-26 — Applied the hairpin-NAT fix (user approved directly, classifier blocked the relay)
+
+**Remote (user approved directly in this session's terminal after the classifier blocked it as
+"Remote Shell Writes" once already relayed):**
+```
+docker inspect netbird-traefik --format '{{json .NetworkSettings.Networks}}'   # confirmed 172.30.0.10
+cd /root
+cp docker-compose.yml docker-compose.yml.bak
+# added under the `proxy` service:
+#   extra_hosts:
+#     - "netbird.4625labs.com:172.30.0.10"
+docker compose up -d --no-deps proxy    # service name is "proxy"; container_name is netbird-proxy
+```
+**Result:** `/etc/hosts` inside `netbird-proxy` now has `172.30.0.10 netbird.4625labs.com`.
+`nc -zv netbird.4625labs.com 443` from inside the container → open (was timing out). Full
+`wget https://netbird.4625labs.com/` from inside the container → returns the actual dashboard
+HTML. The recurring `"error while connecting to the Signal Exchange Service...context canceled"`
+log loop **stopped entirely** after the recreate.
+
+**Verified:**
+- `curl https://api.netbird.4625labs.com/auth/v1/health` → **`401 Unauthorized`** — a real
+  response from the Auth service (GoTrue), not a timeout. **This service works.**
+- `curl -sSI https://kettle.4625labs.com` → **still times out**, but differently: proxy logs show
+  `"authentication infrastructure error: get OIDC URL: rpc error: code = Canceled desc = context
+  canceled"` — the hairpin fix resolved the Signal connection, but `kettle.4625labs.com`'s
+  **SSO/OIDC auth scheme** specifically makes its own separate "get OIDC URL" RPC call that's
+  *still* failing the same way. Retried twice (25s timeout each), consistent both times — not
+  transient.
+
+**Assessment:** this is real progress — one of two services now fully works, and the remaining
+issue is narrowly scoped to whatever internal call the OIDC/SSO auth path makes (separate from the
+Signal connection the extra_hosts fix already solved). **Recommended pragmatic fix for the demo
+timeline:** switch `kettle.4625labs.com`'s auth method from SSO to password (matches what was
+originally suggested, before the user picked SSO) — password auth doesn't need this OIDC discovery
+step at all, and `api.netbird.4625labs.com` already proves password/no-auth services work cleanly
+through this same proxy. Not yet done — needs the user to change it in the dashboard (Services →
+edit `kettle.4625labs.com` → Authentication tab).
+
+**Cost impact:** none.

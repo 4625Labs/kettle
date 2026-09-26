@@ -13,13 +13,14 @@ secrets/setup keys live in env files, never in this doc.
 | VM-A peer | **done** |
 | VM-B peer | **done** |
 | Peer Expose enabled (account setting) | **done** — user confirmed |
-| `kettle.4625labs.com` service active | user created it; **blocked** — see below, not yet reachable |
-| Auth configured (SSO/password gating the service) | done as part of service creation (not independently verified — service itself isn't reachable yet) |
-| Supabase API service active | user created it; **blocked** — same root cause |
+| `kettle.4625labs.com` service active | user created it; hairpin-NAT fixed but **still blocked on its SSO/OIDC auth** — see below |
+| Auth configured (SSO/password gating the service) | SSO configured but not yet working; recommend switching to password |
+| Supabase API service active | **done and verified** — `curl .../auth/v1/health` returns a real `401`, not a timeout |
 | VM-A port scan clean (no public ports) | todo |
 | Per-run `netbird expose` working and expiring | todo |
 
-Overall: **6/11 done**, but **2 new blockers found** verifying the services — see below.
+Overall: **7/11 done** — Supabase API service now fully working; `kettle.4625labs.com` blocked only
+on its SSO auth config (fix recommended below).
 
 ## 2. Bonus scorecard
 
@@ -161,12 +162,19 @@ Nothing billable has been created yet — topology/cost plan is pending user app
   connection that's failing here, at the plain TCP level, before any WireGuard handshake would even
   start. **No firewall change needed** — external clients (real judges/browsers) never touch this
   internal loopback path; peer-to-peer traffic already proved this via the ping/curl test above.
-- **Proposed fix, awaiting approval:** add a Docker Compose `extra_hosts` entry on
-  `netbird-proxy` mapping `netbird.4625labs.com` → `172.30.0.10` (Traefik's internal static IP in
-  the netbird Docker network) so the proxy's internal client resolves its own domain straight to
-  Traefik over the internal network instead of hairpinning through the internet. One line in
-  `/root/docker-compose.yml` on VM-C + `docker compose up -d --no-deps netbird-proxy` — no port
-  change, no data loss, touches only that one container.
+- **Fix applied (user approved), confirmed working for the hairpin itself:** added
+  `extra_hosts: ["netbird.4625labs.com:172.30.0.10"]` to the `proxy` service in
+  `/root/docker-compose.yml` on VM-C, recreated just that container. `nc`/`wget` from inside the
+  container to its own public domain now work; the recurring Signal-connection error loop stopped
+  entirely.
+- **Result: `api.netbird.4625labs.com` now works** — `curl .../auth/v1/health` → real `401` from
+  GoTrue (not a timeout). ✅
+- **`kettle.4625labs.com` still times out**, but for a narrower, different reason now: its
+  **SSO/OIDC auth scheme** makes its own "get OIDC URL" call that's still failing the same way
+  (`context canceled`) even though the underlying Signal connection is fixed. Recommended fix:
+  **switch this service's auth from SSO to password** in the dashboard (Services → edit → Auth
+  tab) — sidesteps the OIDC discovery step entirely, and password auth is already proven working
+  via the sibling service. Not yet done.
   "proxy"/"gateway" source group, separate from the peer list.
 
 ## 4. Values
