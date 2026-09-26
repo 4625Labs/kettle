@@ -381,6 +381,63 @@ seed + demo users. Not started yet.
 
 ---
 
+### 2026-09-26 — Supabase self-hosted on VM-B: setup, migrations, demo users
+
+**What / why:** stand up the actual Supabase stack (Postgres/Auth/Realtime/Storage/REST) per the
+approved plan — official self-host tooling, fresh generated secrets, lean-by-default.
+
+**Remote:**
+```
+ssh root@10.10.0.4 "curl -fsSL https://raw.githubusercontent.com/supabase/supabase/master/docker/setup.sh \
+  -o /root/setup.sh && sh /root/setup.sh -y --project-dir supabase --skip-deps"
+```
+**Note on secrets:** Supabase's own `setup.sh` (`utils/generate-keys.sh --update-env`) prints every
+freshly-generated secret to stdout as its own built-in UX (Postgres password, dashboard password,
+JWT keys/JWKS, S3/MinIO keys, publishable/secret keys) — this is upstream behavior, not something
+this agent requested or configured. Those values appeared in this agent's own tool output/session
+transcript as a result. **Not stored, not repeated, not forwarded anywhere else** (not in this
+file, not in any message to the user or lead) — flagging for full transparency per the "never
+printed" instruction, since the printing happened regardless of that instruction, by the
+third-party script's own design. `.env` was immediately `chmod 600`'d after.
+
+**Result:** this repo's docker-compose.yml/.env.example is **notably newer than my training
+data** — the current self-hosted stack defaults to **Envoy** as the API gateway (not Kong; Kong is
+now an opt-in override via `run.sh config add kong`), and Logflare/Vector analytics are likewise
+opt-in overlays, not default services — so the "lean" requirement (no analytics/logflare/vector)
+was already satisfied by the current upstream defaults, no extra stripping needed. `imgproxy` and
+`edge-functions` remain default services; left them running (not disabled) given time constraints
+and that they're inert unless called.
+
+Set (non-secret) URLs in `.env`: `SUPABASE_PUBLIC_URL`/`PROXY_DOMAIN` = `api.netbird.4625labs.com`
+(matches the planned NetBird service hostname), `API_EXTERNAL_URL` = same + `/auth/v1`, `SITE_URL`
+= `https://kettle.4625labs.com`.
+
+```
+ssh root@10.10.0.4 "cd /root/supabase && sh run.sh start"
+```
+**Result:** all 11 containers healthy (`storage`, `edge-functions`, `realtime`, `meta`, `auth`,
+`pooler`, `rest`, `envoy`, `db`, `studio`, `imgproxy`). API gateway confirmed on port **8000**
+(`API_GW_HTTP_PORT=8000` in `.env`, matches what was already told to the lead as the planned
+target port for the Supabase NetBird service). Verified reachable from **VM-A over the VPC**:
+`curl http://10.10.0.4:8000/rest/v1/` from VM-A → `401` (clean response, not refused — proves
+the network path works; 401 is just an invalid apikey, expected without a real one).
+
+**Applied migrations 0001–0006 + seed.sql** (all 6 exist now after merging `main`, not just
+0001–0003 as originally scoped) via `docker exec -i supabase-db psql -U postgres -v
+ON_ERROR_STOP=1 < <file>`, in order. All succeeded, no errors.
+
+**Demo users:** generated 3 fresh random passwords with `openssl rand` directly on VM-B, appended
+to `/root/supabase/.env` (600 perms) as `KETTLE_OPS_PASSWORD` / `KETTLE_SALES_PASSWORD` /
+`KETTLE_FINANCE_PASSWORD` — **never printed, never sent anywhere**. Ran
+`web/supabase/create-demo-users.sql` against the db with those three as container-exec env vars
+(`docker exec -e KETTLE_OPS_PASSWORD=... ... supabase-db psql ...`) — succeeded (3 `auth.users` +
+3 `auth.identities` + 3 `profiles` upserted). To read them later: `ssh` in via the jump host and
+`grep KETTLE_ /root/supabase/.env` (root only, on VM-B).
+
+**Cost impact:** none (software on an existing instance).
+
+---
+
 ### 2026-09-26 — VM-A and VM-B joined as NetBird peers
 
 **What / why:** connect both app VMs to the self-hosted NetBird network so they can be reached
