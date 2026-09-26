@@ -298,10 +298,33 @@ recorded in this file — lives only in this one command / VM-C's shell history.
   intercepts DNS): `netbird.4625labs.com`, `kettle.4625labs.com`, `test.netbird.4625labs.com` all
   resolve correctly to `144.202.22.122`.
 
-**Flagging for approval, not yet acted on:** the script's own output lists an "optional" port,
-`51820/udp` (WireGuard, for direct P2P proxy connections) — `docker ps` confirms
-`netbird-proxy` publishes it on the host (`0.0.0.0:51820->51820/udp`), but our Vultr firewall group
-`fw-kettle-netbird` has no rule for it (only 22/80/443/3478 are allowed), so Vultr's cloud firewall
-should be blocking it at the network edge already — the feature falls back to relay-only (via
-3478) without it. Not opening this without a fresh ask, per the earlier agreement to flag any new
-port.
+**Decided (lead + user): keep `51820/udp` closed.** Relay-only over 443/3478 is fine; smaller
+attack surface. No firewall rule added.
+
+---
+
+### 2026-09-26 — VM-A/VM-B jump-host access check + VM-A hardening
+
+**Remote (read-only):** `ssh -J root@144.202.22.122 root@10.10.0.3` and `...root@10.10.0.4` (via VM-C).
+**Result:** VM-A — `root` works immediately (plain OS, as expected). VM-B — `Connection refused`
+on port 22, and (checked further) on every other port an active Supabase deployment would expose
+(80, 443, 8000, 5432, 3000), from VM-C over the VPC. VM-B has been `active`/`ok` per the Vultr API
+for ~57 minutes — not a slow-boot situation. **Same failure class as VM-C's original marketplace
+image problem**, on a different vendor's image (Supabase's is `vultr-labs`-authored, so this isn't
+purely a "third-party image" pattern — worth full attention before assuming a fix). Reported to
+lead with a rebuild recommendation; not yet acted on.
+
+**Remote (VM-A hardening + tooling, no cost, no firewall change):**
+```
+# via jump host, as root@10.10.0.3
+- write /etc/ssh/sshd_config.d/99-kettle-hardening.conf: PasswordAuthentication no,
+  PermitRootLogin prohibit-password; sshd -t && systemctl restart ssh
+- apt-get install -y jq docker.io docker-compose-v2; systemctl enable --now docker
+- curl -fsSL https://pkgs.netbird.io/install.sh | sh   (installs the netbird client + service;
+  does NOT run `netbird up` — no setup key yet, agreed to wait until the user's admin account
+  exists)
+```
+**Result:** all succeeded. `PasswordAuthentication no` / `PermitRootLogin prohibit-password`
+confirmed active. Docker 29.1.3 + Compose 2.40.3 installed and running. NetBird client 0.79.0
+installed, service running, **not connected** (no `netbird up` yet, as planned).
+**Cost impact:** none.

@@ -88,10 +88,9 @@ Nothing billable has been created yet — topology/cost plan is pending user app
   (`CN=netbird.4625labs.com`, valid through Dec 25 2026). `dig @1.1.1.1` **run from VM-C itself**
   (not the venue network) confirms `netbird.4625labs.com`, `*.netbird.4625labs.com`, and
   `kettle.4625labs.com` all resolve to `144.202.22.122`.
-- **Flagged, not yet acted on:** the installer's own output lists `51820/udp` (WireGuard, optional
-  direct P2P) as a port it uses; `docker ps` confirms the container publishes it, but our Vultr
-  firewall group has no rule allowing it in, so it should already be blocked at the network edge.
-  Not opening it without a fresh ask — the feature falls back to relay-only (3478/udp) without it.
+- **Decided: keep `51820/udp` closed.** The installer publishes it for optional direct P2P proxy
+  connections, but relay-only over 443/3478 is fine for our purposes and keeps the attack surface
+  smaller. No firewall rule added for it (decision, not just a pending flag).
 - **Not yet done:** no admin account exists on the dashboard yet. Per the plan, the user should
   create this themselves in-browser (never generated or seen by this agent) — see next report for
   exact first-login steps once relayed.
