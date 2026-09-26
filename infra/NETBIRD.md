@@ -122,6 +122,28 @@ Nothing billable has been created yet — topology/cost plan is pending user app
   user), firewall (irrelevant — this is all internal NetBird overlay routing, not the Vultr cloud
   firewall).
 
+### 2026-09-26 — User added an "All → All" Access Control policy — isolated the remaining gap
+- After the policy was added: **direct peer-to-peer traffic now works.** From VM-A: `ping
+  100.75.132.16` (VM-B) succeeds (0% loss), `curl http://100.75.132.16:8000/rest/v1/` → clean
+  `401`. So the policy fixed peer ↔ peer.
+- **But the two reverse-proxy services still time out** (retested with a 20s timeout, still
+  nothing). Restarted the `netbird` client service on both VM-A and VM-B — no change.
+  `netbird status` still reads "0/2 Connected" on both, but that now looks like a red herring
+  (it's the idle "Lazy connection" counter, not a live traffic indicator — the ping/curl above
+  prove traffic works despite it reading 0).
+- **Isolated:** the gap is specifically **VM-C's reverse-proxy cluster → target peer**, not peer ↔
+  peer. VM-C itself was never joined as a NetBird peer (`netbird up`) — it only runs the
+  server/management/dashboard/proxy stack, so the reverse-proxy component likely uses a distinct
+  network identity ("proxy cluster") to reach service targets, separate from the peer ACL that
+  just started working.
+- **Needs from the user, next:** check the **Services status column** (Reverse Proxy → Services)
+  for both services — NetBird docs mention a `tunnel_not_created` status meaning exactly "the
+  proxy cluster hasn't established a tunnel to the target" yet. If either shows that, try editing
+  and re-saving the service (forces a resync) since the ACL policy was added *after* the services
+  were created — the tunnel attempt may only trigger on create/edit, not automatically once a
+  policy appears later. Also worth checking Access Control for anything explicitly naming a
+  "proxy"/"gateway" source group, separate from the peer list.
+
 ## 4. Values
 
 | Item | Value |
