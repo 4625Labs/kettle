@@ -56,5 +56,6 @@ app VM** and the app served through self-hosted NetBird.
 
 ## You need from the user
 Approvals for each billable step, and the BigRock DNS records (they add them). Start by confirming
-`VULTR_API_KEY` works with a read-only `GET /v2/account`. If it returns `Unauthorized IP address`,
-ask the user to add your current IP to the sub-user's API access control in the Vultr console.
+`VULTR_API_KEY` works with a read-only `GET /v2/instances` (`/v2/account` returns 403 by design:
+no billing ACL). If it returns `Unauthorized IP address`, ask the user to add the current IP with
+prefix `/32` to the sub-user's API access control in the Vultr console.
