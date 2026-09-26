@@ -17,6 +17,9 @@ build/
 web/supabase/.branches
 web/supabase/.temp
 
+# per-worktree Claude settings (agent deny rules)
+.claude/settings.local.json
+
 # misc
 .DS_Store
 *.log

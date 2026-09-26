@@ -1,0 +1,15 @@
+#!/bin/sh
+# Only the lead checkout may change refs/heads/main (merge, commit, reset, update-ref, branch -f).
+# Runs for every ref update; --no-verify does not skip it.
+[ "$1" = "prepared" ] || exit 0
+MAIN="/Users/4625labs/Workspace/Hackathons/vultr-hackathon"
+here=$(cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" && pwd -P)
+main=$(cd "$MAIN" && pwd -P)
+[ "$here" = "$main" ] && exit 0
+while read -r old new ref; do
+  if [ "$ref" = "refs/heads/main" ]; then
+    echo "kettle guard: refusing to change main from $here. Only the lead checkout may update main." >&2
+    exit 1
+  fi
+done
+exit 0

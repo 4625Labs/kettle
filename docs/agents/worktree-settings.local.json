@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(gh)",
+      "Bash(gh *)",
+      "Bash(git remote *)",
+      "Bash(git checkout main)",
+      "Bash(git checkout main *)",
+      "Bash(git switch main)",
+      "Bash(git switch main *)",
+      "Bash(git update-ref *)",
+      "Bash(git branch -f *)",
+      "Bash(git branch -D *)",
+      "Bash(git branch --force *)",
+      "Bash(git branch -M *)",
+      "Bash(git branch -m *)",
+      "Bash(git config *)",
+      "Bash(git -c *)",
+      "Bash(git commit --no-verify *)",
+      "Bash(git commit -n *)",
+      "Bash(git merge --no-verify *)",
+      "Bash(git worktree *)",
+      "Edit(//Users/4625labs/Workspace/Hackathons/vultr-hackathon/.git/**)",
+      "Edit(//Users/4625labs/Workspace/Hackathons/vultr-hackathon/scripts/git-guards/**)",
+      "Edit(.claude/**)"
+    ]
+  }
+}

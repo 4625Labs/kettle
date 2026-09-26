@@ -1,0 +1,10 @@
+#!/bin/sh
+# Only the lead checkout may push. Build-agent worktrees are refused.
+MAIN="/Users/4625labs/Workspace/Hackathons/vultr-hackathon"
+here=$(cd "$(git rev-parse --show-toplevel)" && pwd -P)
+main=$(cd "$MAIN" && pwd -P)
+if [ "$here" != "$main" ]; then
+  echo "kettle guard: push refused from $here. Only the lead checkout ($MAIN) may push." >&2
+  exit 1
+fi
+exit 0

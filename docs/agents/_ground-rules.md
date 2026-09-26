@@ -6,6 +6,8 @@ Read this before doing anything. These rules override your defaults.
    open questions). Wait for the user's "go" before writing code.
 2. **Local git only.** Commit to your own branch in your own worktree. **Never** `git push`,
    never create a GitHub repo, never open PRs. The lead session reviews and merges locally.
+   This is enforced by git hooks and permission rules. If a command is denied, don't look for a
+   workaround; say what you needed in your summary.
 3. **Stay in your lane.** Only edit files your prompt says you own. If you need a change elsewhere,
    stop and describe it in your summary for the lead. `web/package.json` / lockfile: add
    dependencies only when necessary, and list them in your summary.
