@@ -438,6 +438,56 @@ to `/root/supabase/.env` (600 perms) as `KETTLE_OPS_PASSWORD` / `KETTLE_SALES_PA
 
 ---
 
+### 2026-09-26 — Rotated Supabase secrets; locked down Studio/imgproxy/edge-functions
+
+**What / why:** the earlier `setup.sh` run printed secrets to this agent's own tool output as
+upstream's built-in behavior. Nothing depended on those values yet, so rotated everything cheaply
+while it still could, this time with output fully suppressed.
+
+**Remote (no values ever appear in output — captured only into shell variables, immediately
+unset):**
+```
+cd /root/supabase
+ORIG_PG_PW=$(grep '^POSTGRES_PASSWORD=' .env | cut -d= -f2-)
+sh utils/generate-keys.sh --update-env >/dev/null 2>&1
+sh utils/add-new-auth-keys.sh --update-env >/dev/null 2>&1
+sed -i "s|^POSTGRES_PASSWORD=.*\$|POSTGRES_PASSWORD=${ORIG_PG_PW}|" .env   # restore, see below
+chmod 600 .env
+```
+**Rotated:** `JWT_SECRET`, `ANON_KEY`, `SERVICE_ROLE_KEY` (legacy), the new asymmetric
+`JWT_KEYS`/`JWKS`, `SUPABASE_PUBLISHABLE_KEY`/`SUPABASE_SECRET_KEY`, `DASHBOARD_PASSWORD`, S3/MinIO
+keys. **Deliberately NOT rotated: `POSTGRES_PASSWORD`** — `generate-keys.sh` regenerates it
+unconditionally as part of the same bundle, but only writes `.env`; it does **not** run `ALTER
+ROLE` against the live database, so leaving the new value in place would have broken every
+service's DB auth (matches the risk the lead flagged). Captured the original value first, let the
+script write its new one, then overwrote just that one line back to the original — net effect:
+everything else rotated, Postgres auth untouched and still consistent with the running DB.
+**Demo user passwords (`KETTLE_*_PASSWORD`) were untouched** — separate mechanism, unaffected.
+
+**Remote:** `sh run.sh recreate` — force-recreated all 11 containers to pick up rotated values.
+**Result:** all 11 healthy again.
+
+**Re-verified:**
+- VM-A → VM-B:8000 over the VPC: still `401` on `/rest/v1/` with no key (clean response).
+- Demo sign-in: `POST /auth/v1/token?grant_type=password` for `ops@kettle.demo` with its (untouched)
+  password → `200`, valid `access_token` returned. Confirms rotation didn't break auth and the
+  demo account still works.
+
+**Studio/imgproxy/edge-functions — stopped, not removed** (`docker stop supabase-studio
+supabase-imgproxy supabase-edge-functions`): none of the three are used by our architecture, and
+Studio specifically would otherwise be reachable through the same public gateway port (8000) the
+planned `api.netbird.4625labs.com` NetBird service targets, protected only by a Basic-Auth
+dashboard password — not acceptable once that service has no NetBird-level auth (by design, so the
+browser can reach it). Confirmed Envoy still returns `401 Basic realm=...` on `/` even with the
+Studio container stopped (the auth check is enforced at the gateway itself, independent of the
+upstream container's state) — so even a leaked/guessed Basic Auth password can't reach an actual
+UI. `/rest/v1/` (the path we actually need) is unaffected. To use Studio later: start the container
+back up and reach it via an SSH tunnel through the jump host, never through the public gateway.
+
+**Cost impact:** none.
+
+---
+
 ### 2026-09-26 — VM-A and VM-B joined as NetBird peers
 
 **What / why:** connect both app VMs to the self-hosted NetBird network so they can be reached
