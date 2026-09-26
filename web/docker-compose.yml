@@ -13,6 +13,10 @@ services:
       - .env
     ports:
       - "127.0.0.1:3000:3000"
+      # VM-A's NetBird overlay IP, so the self-hosted NetBird reverse-proxy (running on VM-C,
+      # reaching peers only over the NetBird mesh) can reach this container. Update if VM-A is
+      # ever rebuilt and gets a different NetBird IP (check `netbird status` there).
+      - "100.75.158.87:3000:3000"
     healthcheck:
       test:
         [

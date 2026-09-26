@@ -1,0 +1,14 @@
+[Unit]
+Description=Kettle N4 per-run NetBird expose watcher
+After=netbird.service docker.service
+Wants=netbird.service docker.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/opt/kettle/kettle-expose-watcher.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

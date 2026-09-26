@@ -16,19 +16,20 @@ secrets/setup keys live in env files, never in this doc.
 | `kettle.4625labs.com` service active | **done and verified** — user switched auth to password; `401` with the NetBird auth form renders correctly end to end |
 | Auth configured (SSO/password gating the service) | **done** — password auth, confirmed working |
 | Supabase API service active | **done and verified** — `curl .../auth/v1/health` returns a real `401`, not a timeout |
-| VM-A port scan clean (no public ports) | todo |
-| Per-run `netbird expose` working and expiring | todo |
+| VM-A port scan clean (no public ports) | **done** — two independent external scans, all filtered |
+| Per-run `netbird expose` working and expiring | **done (infra side)** — watcher built, deployed, tested end to end with a throwaway run; frontend display + public read-only route still needed (not infra's lane) |
 
-Overall: **9/11 done** — both reverse-proxy services fully working, first deploy is live behind
-`kettle.4625labs.com`. Remaining: VM-A port scan, per-run `netbird expose` (N4).
+Overall: **11/11 done on infra's side.** Frontend still needs to surface the per-run URL/PIN to
+`ops_manager` and add a public read-only run route — tracked separately, lead briefing Frontend
+after their phase-2 stages 1–3.
 
 ## 2. Bonus scorecard
 
 | Criterion | Evidence |
 |---|---|
-| No open ports (VM-A) | NetBird peer + client installed, port scan not yet run — pending |
+| No open ports (VM-A, VM-B) | **done** — two independent external scans, both all-filtered: (1) **lead-run, 2026-09-26, from the venue network**: `64.177.51.161` and `96.30.205.155`, ports `22/80/443/3000/5432/8000`, all filtered/no response, while `kettle.4625labs.com` stayed reachable via NetBird. (2) **this agent, 2026-09-26, `nmap -Pn` from VM-C** (a second, different public vantage point): same ports on both IPs, all `filtered`. Zero open ports confirmed from two independent external locations. |
 | Gated access | **done** — `https://kettle.4625labs.com` returns `401` with NetBird's password auth form; app itself is running behind it (deployed `55071a5`, see `DEPLOYS.md`) |
-| Lifecycle-bound URLs | not yet — pending worker integration of `netbird expose` (NetBird Proxy component is running, confirmed via `docker ps`) |
+| Lifecycle-bound URLs | not yet — design in progress (N4), see entry below |
 
 ## 3. What was done
 
@@ -181,6 +182,38 @@ Nothing billable has been created yet — topology/cost plan is pending user app
   correctly (`title: NetBird Service`). The app itself is running behind it and healthy.
 - **Both reverse-proxy services now fully verified working.** Remaining NetBird items: VM-A port
   scan (bonus evidence) and per-run `netbird expose` (N4).
+
+### 2026-09-26 — 502 fix: web wasn't bound to VM-A's NetBird IP
+- After the deploy, the user got a 502 past the password page. Root cause: `web` only published
+  `127.0.0.1:3000`, but VM-C's proxy reaches peers over the NetBird mesh IP, not localhost.
+- Fix: added `100.75.158.87:3000:3000` to the compose `ports:` list (both deployed and source), a
+  systemd drop-in so Docker always starts after `netbird.service`. Verified from **VM-B** (a real
+  peer): health check over the NetBird IP → `200`. `kettle.4625labs.com` reaches the backend again.
+- Confirmed the fix survives `systemctl restart docker`; a full VM reboot is unverified (deferred
+  to a quiet window later, per the lead).
+
+### 2026-09-26 — Port scan evidence (N1) recorded from two vantage points
+- Lead's own scan from the venue network + this agent's `nmap` from VM-C: both show VM-A/VM-B
+  fully `filtered` on `22/80/443/3000/5432/8000`. N1 bonus is fully evidenced.
+
+### 2026-09-26 — N4 built, deployed, and tested end to end
+- Host-side systemd watcher (`infra/scripts/kettle-expose-watcher.sh` +
+  `.service`) on VM-A polls `agent_runs` via PostgREST (no migration, no worker change, per the
+  lead's simplified design). For each `running` run without `options.expose_url`, runs `netbird
+  expose 3000 --with-pin <random 6-digit> --with-name-prefix run-<8 chars of id>`, merges
+  `{expose_url, expose_pin, expose_started_at}` into `options`. On the run leaving `running`,
+  kills the process and adds `expose_ended_at`. Reconciles orphaned `netbird expose` processes on
+  its own startup (crash recovery). Respects NetBird's 10-per-peer cap.
+- **Security note:** debugging a crash in this script (`bash -x`) briefly printed real
+  `SUPABASE_SERVICE_ROLE_KEY` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `VULTR_INFERENCE_API_KEY` values
+  into this agent's own output — flagged in `ACTIONS.md` with a rotation recommendation, not yet
+  actioned (pending lead/user decision on timing).
+- **Tested end to end** with a throwaway `agent_runs` row (inserted and deleted via PostgREST):
+  exposure created within one poll cycle with the correct `options` keys, then torn down correctly
+  when the run was marked `completed`. Full detail in `ACTIONS.md`.
+- **Not infra's lane, still needed:** frontend display of the URL/PIN to `ops_manager`, and a
+  public read-only `/r/[runId]`-style route for the exposed link to actually serve something
+  meaningful. Lead is briefing Frontend on this.
 
 ## 4. Values
 
