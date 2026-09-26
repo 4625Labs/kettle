@@ -2,6 +2,7 @@
 // Supabase + Vultr inference with an in-process worker, auto-approving gates as a human would.
 //   npm run eval                # 5 runs
 //   npm run eval -- 1 --keep    # 1 run, keep its data for inspection
+//   npm run eval -- 1 --late    # customer pays late: overdue follow-up path (F5, S4)
 //   npm run eval -- --cleanup   # delete every leftover [eval] deal and its run data
 // Each run creates its own won deal (no reset_demo, so shared local data is untouched) and asserts
 // only on its own run_id. Passing runs are cleaned up; failing runs are kept for debugging.
@@ -14,6 +15,7 @@ const LAPTOP = "20000000-0000-0000-0000-000000000001";
 const OPS_USER = "40000000-0000-0000-0000-000000000001";
 const RUN_BUDGET_MS = 60_000;
 const HARD_TIMEOUT_MS = 120_000;
+const LATE = process.argv.includes("--late");
 
 const db = serviceDb();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -93,10 +95,10 @@ async function check(runId: string, dealId: string, ms: number): Promise<Pick<Ru
   expect((pays ?? []).some((p) => p.status === "sent"), "vendor payment not sent");
 
   const { data: recv } = await db.from("invoices").select("status").eq("deal_id", dealId).eq("direction", "receivable").maybeSingle();
-  expect(recv?.status === "paid", `receivable status ${recv?.status}`);
+  expect(recv?.status === (LATE ? "overdue" : "paid"), `receivable status ${recv?.status}`);
 
   const { data: handoffs } = await db.from("handoffs").select("type, status").eq("run_id", runId);
-  for (const t of ["purchase_request.create", "customer_invoice.create", "vendor_invoice.expect", "invoice.anomaly", "invoice.corrected", "payment.status"]) {
+  for (const t of ["purchase_request.create", "customer_invoice.create", "vendor_invoice.expect", "invoice.anomaly", "invoice.corrected", LATE ? "receivable.overdue" : "payment.status"]) {
     const hs = (handoffs ?? []).filter((h) => h.type === t);
     expect(hs.length >= 1, `no ${t} handoff`);
     expect(hs.every((h) => h.status === "done"), `${t} handoff not done (${hs.map((h) => h.status).join(",")})`);
@@ -147,6 +149,11 @@ async function runOnce(i: number): Promise<RunReport> {
   let runId: string | null = null;
   try {
     runId = await waitForRun(job.id);
+    if (LATE) {
+      // customer.payment is enqueued ~2 s after the receivable is issued; set the flag before then.
+      const { data: run } = await db.from("agent_runs").select("options").eq("id", runId).single();
+      await db.from("agent_runs").update({ options: { ...(run?.options as object), customer_pays_late: true } }).eq("id", runId);
+    }
     for (;;) {
       const { data: run } = await db.from("agent_runs").select("status").eq("id", runId).single();
       if (run?.status !== "running") break;

@@ -57,9 +57,6 @@ export async function issueCustomerInvoice(runId: string, p: CustomerInvoiceCrea
       rationale: `Issued customer invoice ${number} for $${p.amount.toLocaleString("en-US")}, due ${p.due_date}.`,
     });
   }
-  // W4: the simulated customer settles a few seconds later (P1). Sim decides on-time vs late from
-  // agent_runs.options.customer_pays_late.
-  await enqueue("customer.payment", { run_id: runId, invoice_id: invoiceId }, { delayMs: 2_000 });
 }
 
 export async function expectVendorInvoice(runId: string, p: VendorInvoiceExpectPayload) {
@@ -300,6 +297,7 @@ export async function onPaymentDecided(runId: string, paymentId: string, approve
   if (approved) {
     await db.from("payments").update({ status: "sent", paid_at: new Date().toISOString() }).eq("id", paymentId);
     await db.from("invoices").update({ status: "paid" }).eq("id", pay.invoice_id);
+    await requestCustomerPayment(runId, pay.invoice_id);
   } else {
     await db.from("payments").update({ status: "failed" }).eq("id", paymentId);
   }
@@ -315,6 +313,25 @@ export async function onPaymentDecided(runId: string, paymentId: string, approve
       : `Payment rejected by the controller${note ? `: "${note}"` : ""}.`,
   });
   await checkRunComplete(runId);
+}
+
+// W4 (P1): once the vendor is paid, the simulated customer settles the receivable — the last beat
+// of the golden path (§6.5). Sim decides on-time vs late from agent_runs.options.customer_pays_late.
+async function requestCustomerPayment(runId: string, payableId: string) {
+  const db = serviceDb();
+  const payable = must(await db.from("invoices").select("purchase_order_id").eq("id", payableId).single(), "load payable");
+  if (!payable.purchase_order_id) return;
+  const ctx = await loadPoContext(payable.purchase_order_id);
+  if (!ctx.pr.deal_id) return;
+  const { data: receivable } = await db
+    .from("invoices")
+    .select("id, status")
+    .eq("deal_id", ctx.pr.deal_id)
+    .eq("direction", "receivable")
+    .maybeSingle();
+  if (receivable?.status === "pending") {
+    await enqueue("customer.payment", { run_id: runId, invoice_id: receivable.id });
+  }
 }
 
 // F5-lite: the simulated customer paid, or the receivable went overdue.
