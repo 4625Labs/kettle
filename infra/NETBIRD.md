@@ -12,15 +12,14 @@ secrets/setup keys live in env files, never in this doc.
 | Dashboard reachable + admin created | **done** — user confirmed admin account works, Peers shows kettle-app and kettle-db |
 | VM-A peer | **done** |
 | VM-B peer | **done** |
-| Peer Expose enabled (account setting) | todo |
-| `kettle.4625labs.com` service active | todo |
-| Auth configured (SSO/password gating the service) | todo |
-| Supabase API service active | todo |
+| Peer Expose enabled (account setting) | **done** — user confirmed |
+| `kettle.4625labs.com` service active | user created it; **blocked** — see below, not yet reachable |
+| Auth configured (SSO/password gating the service) | done as part of service creation (not independently verified — service itself isn't reachable yet) |
+| Supabase API service active | user created it; **blocked** — same root cause |
 | VM-A port scan clean (no public ports) | todo |
 | Per-run `netbird expose` working and expiring | todo |
 
-Overall: **5/11 done** (VM-C created, DNS verified, dashboard + admin working, VM-A peer, VM-B
-peer). Next: Peer Expose, the two reverse-proxy services, auth.
+Overall: **6/11 done**, but **2 new blockers found** verifying the services — see below.
 
 ## 2. Bonus scorecard
 
@@ -95,6 +94,33 @@ Nothing billable has been created yet — topology/cost plan is pending user app
 - **Not yet done:** no admin account exists on the dashboard yet. Per the plan, the user should
   create this themselves in-browser (never generated or seen by this agent) — see next report for
   exact first-login steps once relayed.
+
+### 2026-09-26 — Admin account, Peer Expose, two services all created — but neither service works yet
+- User confirmed: admin account works, Peers page shows `kettle-app` and `kettle-db`, Peer Expose
+  is enabled, and both reverse-proxy services exist: `kettle.4625labs.com` → `kettle-app:3000`,
+  `api.netbird.4625labs.com` → `kettle-db:8000`.
+- Verification (from VM-C): `curl -sI https://kettle.4625labs.com` and `curl -s
+  https://api.netbird.4625labs.com/auth/v1/health` — **both time out** (no response, not even a
+  clean 502/401). DNS resolves correctly for both (`dig @1.1.1.1` → `144.202.22.122`).
+- **Root cause found:** `netbird status` on **both VM-A and VM-B shows "Peers count: 0/1
+  Connected"** — each VM is connected to Management/Signal fine, but has **no working
+  peer-to-peer/relay connection to the other peer** (or to the proxy component's routing). The
+  proxy's own logs (`docker logs netbird-proxy` on VM-C) show it repeatedly trying and failing to
+  reach `kettle-db`'s NetBird IP (`100.75.132.16:8000`) — requests hang rather than failing
+  cleanly, consistent with a broken/blocked overlay path, not just "nothing deployed yet."
+- **Likely cause (not yet confirmed):** a missing or misconfigured Access Control policy in the
+  NetBird dashboard. Self-hosted NetBird doesn't always ship a default "allow all peers" policy —
+  if none exists (or a default-deny policy is in effect), peers can register with Management but
+  never establish an actual data path to each other or to the proxy. This is dashboard/account
+  configuration territory this agent doesn't have credentials for.
+- **Needs from the user:** check **Access Control / Policies** in the dashboard — confirm a policy
+  exists that allows the reverse-proxy service to reach `kettle-app`/`kettle-db` (and ideally that
+  `kettle-app`/`kettle-db` can reach each other, for later VM-A ↔ VM-B traffic). If no policy
+  exists, create one (a broad "Allow all peers" default policy is the simplest fix for now, suitable
+  for a single-tenant demo like this).
+- Ruled out as the cause: DNS (correct), the services themselves (both created correctly per the
+  user), firewall (irrelevant — this is all internal NetBird overlay routing, not the Vultr cloud
+  firewall).
 
 ## 4. Values
 

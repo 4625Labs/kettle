@@ -538,6 +538,33 @@ will be told before it happens.
 
 ---
 
+### 2026-09-26 — Applied the same Docker DNS fix to VM-B; verified both NetBird services (blocked)
+
+**Remote:** same `/etc/docker/daemon.json` fix as VM-A (VM-B has a NetBird client too, same
+conflict was present — confirmed with `docker run --rm alpine:3.24 getent hosts
+dl-cdn.alpinelinux.org` failing before, working after). `systemctl restart docker` on VM-B
+restarts every container, so the whole Supabase stack bounced — confirmed all 8 (still-running)
+containers came back `healthy` afterward, REST gateway still responds. No data loss (just a
+container restart, not a rebuild).
+
+**Verification requested by lead:** `curl -sI https://kettle.4625labs.com` and `curl -s
+https://api.netbird.4625labs.com/auth/v1/health` from VM-C. **Both timed out** (15s), no response
+at all — not the expected password page or a clean 502.
+
+**Diagnosed:** DNS is fine for both hostnames (`dig @1.1.1.1` → `144.202.22.122`). `netbird
+status` on VM-A and VM-B both show `Peers count: 0/1 Connected` — Management/Signal connected, but
+no working peer-to-peer path to each other. `docker logs netbird-proxy` on VM-C shows it
+repeatedly trying to reach `kettle-db` at `100.75.132.16:8000` (correct target) and hanging until
+my own curl client's timeout cancels the request (`"client start failed: context canceled"`) —
+i.e., the proxy is configured correctly, but the underlying NetBird overlay path to the peer isn't
+working. Likely cause: no Access Control policy in the dashboard allowing this traffic (self-hosted
+NetBird doesn't always ship a default allow-all policy). This is dashboard-config territory this
+agent has no credentials for — passed to the user/lead as the next step.
+
+**Cost impact:** none.
+
+---
+
 ### 2026-09-26 — VM-A and VM-B joined as NetBird peers
 
 **What / why:** connect both app VMs to the self-hosted NetBird network so they can be reached
