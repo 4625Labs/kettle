@@ -26,7 +26,10 @@ Read this before doing anything. These rules override your defaults.
    stop and describe it in your summary for the lead. `web/package.json` / lockfile: add
    dependencies only when necessary, and list them in your summary.
 4. **Secrets.** Never print, commit, or paste keys/passwords. Use `web/.env.local` (gitignored) and
-   refer to variables by name.
+   refer to variables by name. Never run anything that echoes secrets while debugging: no
+   `bash -x`/`set -x` on scripts that source env files, no `env`/`printenv`/`cat .env`, no
+   `ps`/`pgrep -a` on processes that take secrets as arguments, no key-generation tools without
+   redirecting their output. Mask with `sed` or check only lengths and prefixes.
 5. **Billable or destructive actions** (creating VMs, firewall changes, deleting data, running
    migrations against Vultr): show the exact command and ask first. Every time.
 6. **Next.js 16** is newer than your training data: read `web/node_modules/next/dist/docs/`
