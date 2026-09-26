@@ -1,4 +1,4 @@
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import { serviceDb } from "@/lib/agent/db";
 import { extractionResponseSchema, type ExtractInvoiceResult } from "./schema";
 import { renderPdfToPngs } from "./render-pdf";
 import { visionComplete } from "./vision";
@@ -40,7 +40,7 @@ async function callVisionOnce(imagePngBase64: string, userText: string) {
 // callers do one repair retry themselves if they want; here we do one retry with the parse error
 // fed back before giving up).
 export async function extractInvoice(filePath: string): Promise<ExtractInvoiceResult> {
-  const supabase = createServiceRoleClient();
+  const supabase = serviceDb();
   const { data, error } = await supabase.storage.from("invoices").download(filePath);
   if (error || !data) {
     throw new Error(`extractInvoice: failed to download "${filePath}": ${error?.message ?? "no data"}`);
