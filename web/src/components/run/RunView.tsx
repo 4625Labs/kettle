@@ -40,17 +40,19 @@ export function RunView({
   timeline,
   role,
   exposeOptions,
+  hideControls = false,
 }: {
   timeline: TimelineItem[];
   role?: Role;
   exposeOptions?: RunOptions;
+  hideControls?: boolean;
 }) {
   const [selected, setSelected] = useState<AgentStep | null>(null);
 
   if (timeline.length === 0) {
     return (
       <div className="flex flex-1 flex-col">
-        <ControlBar />
+        {!hideControls && <ControlBar />}
         {role && exposeOptions && <ExposeLinkBanner role={role} options={exposeOptions} />}
         <RunViewEmpty />
       </div>
@@ -59,7 +61,7 @@ export function RunView({
 
   return (
     <div className="flex flex-1 flex-col">
-      <ControlBar />
+      {!hideControls && <ControlBar />}
       {role && exposeOptions && <ExposeLinkBanner role={role} options={exposeOptions} />}
       <LaneHeaders sticky />
 
