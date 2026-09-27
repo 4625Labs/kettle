@@ -42,3 +42,41 @@ working; worker is running and idle-healthy on real Supabase.
 **Known gaps for next deploy:** no automated smoke-test script yet (all manual); worker has never
 processed a real job end-to-end (needs an actual triggered run to prove out `claim_job` +
 dispatch, not just idle heartbeat).
+
+## 2026-09-27 00:13 UTC — `47c17bd` — SUCCESS (bundled secret rotation + redeploy)
+
+**What:** combined window, user-approved. Deployed **`main @ 47c17bd`**, not the originally-named
+`7b52110` — main had simply moved forward in the meantime with exactly the N4 frontend pieces
+(per-run link banner + read-only `/r/[runId]` page, commits `1f5d892`/`c419982`), confirmed
+`7b52110` is an ancestor (no divergence) before deploying the newer commit instead.
+
+**Rotation (VM-B), immediately before this deploy so nothing ran with mismatched keys:**
+`JWT_SECRET`/`ANON_KEY`/`SERVICE_ROLE_KEY`/JWKS/publishable+secret/`DASHBOARD_PASSWORD`/S3 keys
+regenerated via the suppressed-output procedure; `POSTGRES_PASSWORD` checked for `|`/`&` (none
+found) and restored via the sed guard. `sh run.sh recreate` — this also silently un-stopped
+Studio/imgproxy/edge-functions (recreate rebuilds the whole stack from the compose file, not just
+the containers that were running) — re-stopped those three immediately after. Vultr Inference key
+was rotated separately by the user via the Vultr console; the lead verified it worked (`200`)
+without printing it.
+
+**Env for the new release (`/opt/kettle/current/web/.env`, 600 perms):** old key lines removed,
+fresh `NEXT_PUBLIC_SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` piped directly from VM-B
+(renamed in-flight from `ANON_KEY`/`SERVICE_ROLE_KEY`), fresh `VULTR_INFERENCE_*` piped directly
+from the lead's local `web/.env.local`. No value ever printed.
+
+**Build/up:** `docker compose build` (bakes the new anon key into the web image) → both images
+built clean. `docker compose up -d` → both containers recreated, both port bindings
+(`127.0.0.1:3000`, `100.75.158.87:3000`) preserved from the earlier 502 fix.
+`systemctl restart kettle-expose-watcher` — it only sources `.env` once at startup, so it needed a
+restart to pick up the new service-role key. Clean restart, no crash.
+
+**Verified, all passed:**
+- `curl http://127.0.0.1:3000/api/health` → `200 {"status":"ok"}`.
+- Worker: started, then two clean `heartbeat` lines 30s apart — new service-role key works.
+- Demo sign-in (`ops@kettle.demo`, unchanged password) → `200`, valid access token — new anon key
+  works.
+- `curl -sSI https://kettle.4625labs.com` from VM-C → `401` (NetBird auth page, as expected).
+- `curl https://api.netbird.4625labs.com/auth/v1/health` → `401` (real GoTrue response).
+
+**Result: full success.** All three rotated secrets (JWT/anon/service-role, Vultr Inference key)
+now in place end to end; app, worker, and N4 watcher all confirmed working on the new keys.
