@@ -6,23 +6,27 @@ the agent playbook is [`agents/README.md`](agents/README.md).
 
 ## TL;DR
 
-- The agent core works end to end: golden path + anomaly passes **5/5** locally with the real
-  Sim-world and Vultr inference (~19 s/run, 16 LLM calls, 0 fallbacks).
+- **The app is fully built and deployed.** All 10 live test scenarios in
+  [`TEST-PLAN.md`](TEST-PLAN.md) pass against `https://kettle.4625labs.com`, including the N4
+  per-run link (fixed to open `/r/[runId]` directly, not the Kettle login).
+- Golden path + anomaly passes **5/5** locally with the real Sim-world and Vultr inference
+  (~19 s/run, 16 LLM calls, 0 fallbacks).
 - Vultr infra is up: 3 VMs, VPC, firewalls, self-hosted **NetBird** (VM-C) and **Supabase** (VM-B).
-  `api.netbird.4625labs.com` answers through NetBird.
-- **In flight:** first deploy of `main` @ `55071a5` to VM-A (Infra, user-approved), and Frontend
-  Phase 2 (realtime run view, approvals, deal page, control bar).
-- **Not started:** QA & docs agent (README/ARCHITECTURE/DEMO, Playwright, video), N4 per-run URLs.
-- GitHub `4625Labs/kettle` is **private**, at `a49a43e`. `main` locally is ahead (`55071a5`).
-  **Must flip to public before submission.**
+  Zero public ports on the app/DB VMs.
+- Live deploy: `main` @ `9bdd22c` on VM-A, deployed and smoke-tested (health, sign-in, worker
+  heartbeat, watcher restart, PDF render check).
+- **Not started:** QA & docs agent (README rewrite, `ARCHITECTURE.md`, `DEMO.md`, Playwright smoke
+  test), demo video/rehearsal, GitHub push, flipping the repo public.
+- GitHub `4625Labs/kettle` is **private**, at `3cf7173`. `main` locally is far ahead (`71d3214`).
+  **Push only when the user asks, then flip to public before submission.**
 
 ## Git
 
 | Ref | Commit | Notes |
 |---|---|---|
-| local `main` | `55071a5` | everything merged; clean |
-| `origin/main` | `a49a43e` | push pending (lead only) |
-| `agent/*` branches | all 0 ahead of main | infra, data, frontend, agents-core, simworld |
+| local `main` | `71d3214` | everything merged; clean |
+| `origin/main` | `3cf7173` | push pending (lead only) |
+| `agent/*` branches | merged into main, worktrees idle | infra, frontend active this wave; data, agents-core, simworld finished earlier |
 
 Only the lead checkout can push or change `main` (hooks + deny rules; see agents/README.md).
 
@@ -51,7 +55,7 @@ Legend: ✅ done · 🟡 partial / in progress · ⬜ not started
 |---|---|---|
 | F1–F4 | ✅ | receivable, 3-way match with tolerance (5%), anomaly handback, payment gate (finance_controller) |
 | F5 overdue follow-up | ✅ | eval `--late` passes |
-| F6 PDF → vision extraction | ✅ | `glm-5.3-flash`; low-confidence (<0.7) approval path written, not exercised |
+| F6 PDF → vision extraction | ✅ | `glm-5.3-flash`; low-confidence (<0.7) approval path exercised live (scenario 3.4) |
 | F7 cash summary | ⬜ | stretch |
 
 ### Coordination
@@ -73,39 +77,42 @@ Legend: ✅ done · 🟡 partial / in progress · ⬜ not started
 ### Web app
 | ID | Status | Notes |
 |---|---|---|
-| U1 live run view | 🟡 | Phase 1 on mock data merged; Phase 2 realtime in progress |
-| U2 deal lifecycle page | 🟡 | Phase 2 |
-| U3 approvals inbox | 🟡 | Phase 2 (update approvals row only; trigger does the rest) |
-| U4 step inspector | 🟡 | built on mock data; wires up in Phase 2 |
+| U1 live run view | ✅ | realtime, all lanes, handoff arrows |
+| U2 deal lifecycle page | ✅ | line items, PR, quotes with vendor message, PO + approval, invoices w/ confidence, payments |
+| U3 approvals inbox | ✅ | role-scoped (sales empty, finance payments-only, ops everything) |
+| U4 step inspector | ✅ | drawer: input, output, rationale, model, latency, tokens |
 | U5 auth + roles | ✅ | roles from `profiles`; no profile = unauthorized |
 | U6 landing page | ✅ | |
 
 ### Zero-port (NetBird bonus)
 | ID | Status | Notes |
 |---|---|---|
-| N1 no inbound on VM-A | 🟡 | firewall has no public rules; external port-scan evidence pending |
-| N2 gated access | 🟡 | `kettle.4625labs.com` password auth (SSO dropped: OIDC discovery failed); verify after deploy |
+| N1 no inbound on VM-A | ✅ | firewall has no public rules; verified from two external vantage points |
+| N2 gated access | ✅ | `kettle.4625labs.com` password auth (SSO dropped: OIDC discovery failed) |
 | N3 Supabase API via NetBird | ✅ | `api.netbird.4625labs.com` → kettle-db:8000, answers (401 health) |
-| N4 per-run expiring URLs | ⬜ | Peer Expose enabled; `netbird expose` not implemented |
+| N4 per-run expiring URLs | ✅ | `kettle-expose-watcher` systemd unit runs `netbird expose` per active run, writes URL+PIN to `agent_runs.options`; banner links to `/r/[runId]` directly (fixed 2026-09-26); expires ~90s after run ends |
 
-## Infrastructure (details: `infra/README.md`, `infra/ACTIONS.md`, `infra/NETBIRD.md`)
+## Infrastructure (details: `infra/README.md`, `infra/ACTIONS.md`, `infra/NETBIRD.md`, `infra/DEPLOYS.md`)
 
 | VM | Role | Public IP | VPC IP | NetBird IP | State |
 |---|---|---|---|---|---|
-| VM-A kettle-app | web + worker (Docker) | 64.177.51.161 (no inbound) | 10.10.0.3 | 100.75.158.87 | deploy in progress |
-| VM-B kettle-db | Supabase self-host (official compose, Envoy on 8000) | 96.30.205.155 (no inbound) | 10.10.0.4 | 100.75.132.16 | healthy, migrations 0001–0006 + seed + demo users |
-| VM-C kettle-netbird | NetBird self-host (Traefik, mgmt, dashboard, proxy) | 144.202.22.122 | 10.10.0.5 | n/a | healthy |
+| VM-A kettle-app | web + worker (Docker) | 64.177.51.161 (no inbound) | 10.10.0.3 | 100.75.158.87 | healthy, `main`@`9bdd22c` live |
+| VM-B kettle-db | Supabase self-host (official compose, Envoy on 8000) | 96.30.205.155 (no inbound) | 10.10.0.4 | 100.75.132.16 | healthy, migrations 0001–0007 + seed + demo users |
+| VM-C kettle-netbird | NetBird self-host (Traefik, mgmt, dashboard, proxy) | 144.202.22.122 | 10.10.0.5 | n/a | healthy, `kettle-expose-watcher` running |
 
 - Region atl, $0.075/h total. VPC 10.10.0.0/24. SSH: laptop → VM-C (root, key) → VPC.
-- DNS (BigRock): `netbird` A, `*.netbird` CNAME, `kettle` CNAME (+ a verification CNAME added by the user).
+- DNS (BigRock): `netbird` A, `*.netbird` CNAME, `kettle` CNAME, plus a verification CNAME.
 - NetBird: admin account (user-owned), allow-all policy, Peer Expose on, 51820/udp intentionally closed.
-- Lessons learned (all recorded in ACTIONS.md):
+- Lessons learned (all recorded in `infra/ACTIONS.md`):
   - Vultr NetBird and Supabase **marketplace images were broken**; both VMs were reinstalled as plain Ubuntu 24.04 (same IPs).
   - `vpc_ids` at create time was ignored; attached with `/vpcs/attach`.
   - Installing the NetBird client overwrites `/etc/resolv.conf`, which breaks Docker DNS. Fixed with `/etc/docker/daemon.json` dns on VM-A and VM-B.
   - Docker hairpin NAT: `netbird-proxy` couldn't reach its own public domain. Fixed with `extra_hosts: netbird.4625labs.com:172.30.0.10`.
   - The `NETBIRD_AGENT_NETWORK=true` preset hides the dashboard and makes the proxy private; removed from dashboard.env and proxy.env.
   - Supabase `generate-keys.sh` prints secrets; everything except the Postgres password (VPC-only) was rotated silently afterwards. Studio, imgproxy, and edge-functions are stopped.
+  - Worker Alpine image had no fonts, so PDF renders came back blank (0 x $0 extraction). Fixed by
+    adding `poppler-utils fontconfig ttf-dejavu`; deploy runbook now includes a render smoke check.
+  - `deals` table had no SELECT policy (deal page showed nothing); fixed with migration `0007`.
 
 ## Credentials: where they live (never in git or chat)
 
@@ -114,7 +121,7 @@ Legend: ✅ done · 🟡 partial / in progress · ⬜ not started
 | Vultr inference key, sub-user API key | lead `web/.env.local` (copied into each worktree) |
 | Vultr admin key | removed by the user |
 | Supabase JWT/anon/service keys, DB password | VM-B `/root/supabase/.env` (600) |
-| Hosted demo user passwords | VM-B `/root/supabase/.env` as `KETTLE_*_PASSWORD`; read: `ssh -J root@144.202.22.122 root@10.10.0.4 "grep KETTLE_ /root/supabase/.env"` (needs the infra SSH key) |
+| Hosted demo user passwords | VM-B `/root/supabase/.env` as `KETTLE_*_PASSWORD`; read: `ssh -i ~/.ssh/kettle_vultr -o ProxyCommand="ssh -i ~/.ssh/kettle_vultr -W %h:%p root@144.202.22.122" root@10.10.0.4 "grep KETTLE_ /root/supabase/.env"` (needs the infra SSH key) |
 | App runtime env | VM-A `/opt/kettle/.env` (600) |
 | NetBird admin login, kettle service password | the user only |
 | Local dev demo users | `ops@ / sales@ / finance@kettle.demo`, password `kettle-demo` (local only) |
@@ -131,19 +138,24 @@ Legend: ✅ done · 🟡 partial / in progress · ⬜ not started
 
 ## Pending, in priority order
 
-1. **Finish first deploy** (Infra, in flight): verify `https://kettle.4625labs.com` → NetBird password → Kettle login; worker claiming jobs on VM-A.
-2. **Frontend Phase 2**: realtime run view, approvals inbox, deal page, control bar (start / inject anomaly / reset). Then redeploy.
-3. **End-to-end on Vultr**: run the golden path on the deployed stack (extraction uses poppler in the worker image).
-4. **N1 evidence**: external port scan of VM-A; **N4** per-run `netbird expose` URLs (P1).
-5. **QA & docs agent** (Haiku, `docs/agents/qa-docs.md`): README rewrite with architecture diagram, `docs/ARCHITECTURE.md`, `docs/DEMO.md`, Playwright smoke test.
-6. **Demo**: rehearse, 1-minute video from the deployed URL, backup recording.
-7. **Submission**: push `main`, **make the repo public**, submit before 12:00 PM Sunday.
+1. **QA & docs agent** (Haiku, `docs/agents/qa-docs.md`, not started): README rewrite with
+   architecture diagram, `docs/ARCHITECTURE.md`, `docs/DEMO.md`, Playwright smoke test reusing
+   `TEST-PLAN.md`'s scenarios.
+2. **Demo**: rehearse, 1-minute video from the deployed URL, backup recording.
+3. **Submission**: push `main` (lead only, on the user's word), **make the repo public**, decide
+   how judges get the NetBird password + demo logins, submit before 12:00 PM Sunday.
+
+## Optional / stretch
+
+- Full VM-A reboot test (so far only a Docker restart has been verified).
+- Regenerate the diagrams page (published artifact) if the README/architecture changes.
+- Diagrams: `docs/diagrams/` (10 Mermaid diagrams + README), published as a page — link is in
+  `infra/ACTIONS.md`'s history if needed again.
 
 ## Resuming
 
 - Lead session: the main checkout at `/Users/4625labs/Workspace/Hackathons/vultr-hackathon`.
 - Resume an agent: `cd ../kettle-wt/<name> && claude --continue --model <model> --permission-mode acceptEdits`.
-  Active: `infra` (Sonnet), `frontend` (Sonnet). Finished and closed: data, agents-core, simworld.
 - New agents: `scripts/new-agent-worktree.sh <name>` (applies all locks), then launch per agents/README.md.
 - Session names change on restart; agents find the lead by the `vultr-hackathon` name prefix.
 - Local Supabase: `cd web && npx supabase start -x studio,logflare,vector,imgproxy,edge-runtime,supavisor,mailpit`.
