@@ -107,3 +107,19 @@ live-patched test container.
 - `curl -sSI https://kettle.4625labs.com` from VM-C → `401` (auth page, as expected).
 
 **Result: full success.**
+
+## 2026-09-27 01:15 UTC — `9bdd22c` — SUCCESS (frontend-only: run link → /r/[runId])
+
+**What:** `main @ 9bdd22c` — run-link banner now points directly to `/r/<runId>`, plus copy
+tweaks. No key changes (reused `.env` byte-for-byte), no migrations.
+
+**Steps:** same as the previous deploy — ship, copy `.env` into new release dir, `docker compose
+build && up -d`, restart `kettle-expose-watcher`.
+
+**F6 render smoke check:** same known invoice PDF → **70916 bytes**, zero font errors. Consistent
+with the last deploy.
+
+**Verified, all passed:** `/api/health` → `200`; worker clean start + 2 heartbeats; watcher clean
+restart; demo sign-in → `200` with access token; `curl -sSI https://kettle.4625labs.com` → `401`.
+
+**Result: full success.**
