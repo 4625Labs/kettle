@@ -5,7 +5,7 @@ const LANES = (["orchestrator", "sales", "procurement", "finance"] as const).map
 );
 
 // Single column on phones; the 4-lane grid only kicks in at `sm` and up.
-export const GRID_COLS_CLASS = "grid-cols-1 sm:grid-cols-[72px_repeat(3,minmax(0,1fr))]";
+export const GRID_COLS_CLASS = "grid-cols-1 sm:grid-cols-[104px_repeat(3,minmax(0,1fr))]";
 
 export function LaneHeaders({ sticky = false }: { sticky?: boolean } = {}) {
   return (
