@@ -20,7 +20,13 @@ Project runbook. Every agent deploys the same way. **Ask the user before running
 3. On VM-A: point `/opt/kettle/current` at the release, `docker compose build && docker compose up -d`.
 4. Migrate: apply new files from `web/supabase/migrations/` to VM-B (over the VPC) in order; stop on the first error.
 5. Smoke: `curl -fsS https://kettle.4625labs.com/api/health` (with the proxy auth), then open the run view.
-6. Record: append `SHA, time, result` to `infra/DEPLOYS.md`.
+6. **F6 render smoke check** (catches blank PDF renders, e.g. the missing-fonts bug fixed
+   2026-09-27): pick any existing invoice PDF from the `invoices` storage bucket (or a fixture),
+   download it and run `pdftoppm -png -r 150` on it inside the `worker` container exactly as
+   `render-pdf.ts` does, then check the output PNG is **> ~30 KB**. A blank/near-blank render
+   (missing fonts, corrupt PDF, etc.) produces a PNG closer to 5-10 KB at this DPI even for a full
+   page — anything under ~30 KB means investigate before shipping.
+7. Record: append `SHA, time, result` to `infra/DEPLOYS.md`.
 
 ## Rollback
 Point `/opt/kettle/current` at the previous release and `docker compose up -d`. Migrations are forward-only — write a new migration to undo a schema change.

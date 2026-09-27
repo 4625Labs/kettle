@@ -32,7 +32,7 @@ CMD ["node", "server.js"]
 
 FROM node:24-alpine AS worker
 WORKDIR /app
-RUN apk add --no-cache poppler-utils
+RUN apk add --no-cache poppler-utils fontconfig ttf-dejavu
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
 COPY --from=build --chown=nextjs:nodejs /app/worker/dist/index.js ./worker/dist/index.js
