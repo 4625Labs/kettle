@@ -812,3 +812,61 @@ to `ops_manager`) and the public `/r/[runId]` (or similar) read-only route — l
 Frontend on this after their phase-2 stages 1–3 land.
 
 **Cost impact:** none (host-side script + systemd unit on an existing instance).
+
+---
+
+### 2026-09-27 — Diagnosed F6 extraction bug: worker's Alpine image has no fonts for Poppler
+
+**What / why:** live bug — Finance extracted invoice CD-8199120 as "0 x $0 = $0, confidence 0" and
+raised a false anomaly. `extractInvoice` works 5/5 locally; something differs on VM-A. Diagnosed
+read-only per the lead's steps (no env printed).
+
+1. `docker compose logs worker --since 60m | grep -iE "extract|pdftoppm|vision|storage|invoice|error"`
+   → only a normal completion line, no errors. `extractInvoice` throws on real failures (bad
+   download, pdftoppm producing zero pages, model output failing schema validation twice) — none
+   of those happened, so whatever went wrong didn't raise an exception.
+2. `pdftoppm -v` inside the worker container: present, `25.12.0`, works.
+3. `/tmp` inside the container: `drwxrwxrwt`, confirmed writable as the `nextjs` user.
+4. Queried VM-B directly for the actual invoice row: `file_path =
+   PO-8199120/CD-8199120.pdf`. Downloaded that exact file from inside the worker container (Node's
+   built-in `fetch`, since the alpine image has no `curl`) using the worker's own
+   `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` — `200`, `1742` bytes, matches what's stored. Not a
+   storage/network problem.
+5. Ran the **exact same `pdftoppm -png -r 150` command `render-pdf.ts` uses** on that downloaded
+   PDF: `Syntax Error: Couldn't find a font for 'Helvetica-Bold'` / `'Helvetica'`, repeated ~24
+   times. It still produced a PNG (pdftoppm doesn't fail hard on a missing font) — but a **tiny
+   8522-byte PNG** for a full 150dpi page, i.e., essentially blank (no visible text, since Poppler
+   had no font to substitute for the PDF's standard non-embedded `Helvetica`/`Helvetica-Bold`).
+
+**Root cause:** the worker's `node:24-alpine` image installs `poppler-utils` but **no fonts** —
+Alpine ships no base fonts by default, and Poppler needs a real font (via fontconfig substitution)
+to render standard PDF fonts that aren't embedded in the file (Helvetica, Times, Courier — exactly
+what simworld's generated invoice PDFs use, per the visible page content). Without one, `pdftoppm`
+silently renders blank pages instead of failing loudly. The vision model then correctly reports
+"nothing here" — zero fields, zero confidence — on a genuinely blank image. **Not a bug in
+`extractInvoice`, `vision.ts`, or the model choice** — the image it receives is empty.
+
+**Confirmed the fix, live, in the running container** (`docker compose exec -u root`, not
+persisted to the image — this was a diagnostic test, reverted on the container's next recreate):
+`apk add --no-cache fontconfig font-noto ttf-dejavu && fc-cache -f`, then re-ran the identical
+`pdftoppm` command on the same PDF — **zero font errors**, PNG jumped to **71892 bytes** (≈8.4x
+larger — real content). Copied the PNG out and viewed it: a fully legible "Contoso Distribution"
+invoice, `CD-8199120` / `PO-8199120`, `200 × $199.99 = $39,998.00` — exactly the numbers the golden
+path expects, confirming this is the complete root cause, not one of several contributing issues.
+
+**Proposed fix (this agent's lane — `web/Dockerfile`, not yet applied, pending confirmation):**
+add font packages to the `worker` build stage alongside `poppler-utils`:
+```dockerfile
+RUN apk add --no-cache poppler-utils fontconfig ttf-dejavu
+```
+(`ttf-dejavu` + `fontconfig` are the standard minimal combo for Poppler standard-font substitution
+on Alpine; DejaVu Sans/Serif are metric-compatible with Helvetica/Times. Confirmed sufficient in
+the live test above — didn't re-test without `font-noto` given time pressure, but DejaVu alone is
+the well-known standard fix and is what actually rendered the text correctly.) Adds a few MB to
+the worker image, no other side effects.
+
+**Cleanup:** removed test files from the container (`/tmp/test-invoice.pdf`, rendered test PNGs) —
+one root-owned leftover (`/tmp/page2-1.png`, from the `-u root` test exec) couldn't be removed as
+the `nextjs` user; harmless, wiped on the container's next recreate regardless.
+
+**Cost impact:** none (diagnosis + a temporary, reverted container change).
