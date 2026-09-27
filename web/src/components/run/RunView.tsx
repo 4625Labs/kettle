@@ -40,11 +40,13 @@ export function RunView({
   timeline,
   role,
   exposeOptions,
+  runId,
   hideControls = false,
 }: {
   timeline: TimelineItem[];
   role?: Role;
   exposeOptions?: RunOptions;
+  runId?: string | null;
   hideControls?: boolean;
 }) {
   const [selected, setSelected] = useState<AgentStep | null>(null);
@@ -53,7 +55,9 @@ export function RunView({
     return (
       <div className="flex flex-1 flex-col">
         {!hideControls && <ControlBar />}
-        {role && exposeOptions && <ExposeLinkBanner role={role} options={exposeOptions} />}
+        {role && exposeOptions && runId && (
+          <ExposeLinkBanner role={role} options={exposeOptions} runId={runId} />
+        )}
         <RunViewEmpty />
       </div>
     );
@@ -62,7 +66,9 @@ export function RunView({
   return (
     <div className="flex flex-1 flex-col">
       {!hideControls && <ControlBar />}
-      {role && exposeOptions && <ExposeLinkBanner role={role} options={exposeOptions} />}
+      {role && exposeOptions && runId && (
+        <ExposeLinkBanner role={role} options={exposeOptions} runId={runId} />
+      )}
       <LaneHeaders sticky />
 
       <div className={`grid flex-1 gap-x-3 gap-y-2 overflow-y-auto px-4 py-3 ${GRID_COLS_CLASS}`}>

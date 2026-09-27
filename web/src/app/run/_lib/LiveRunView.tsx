@@ -141,5 +141,5 @@ export function LiveRunView({
     [steps, handoffs, approvals],
   );
 
-  return <RunView timeline={timeline} role={role} exposeOptions={options} />;
+  return <RunView timeline={timeline} role={role} exposeOptions={options} runId={runId} />;
 }
