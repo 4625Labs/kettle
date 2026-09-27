@@ -401,6 +401,13 @@ When a step is recorded (worker inserts a row), Supabase Realtime broadcasts it 
 - Retry: Failed jobs retry with exponential backoff (base 500ms) up to 5x.
 - Stale job reaper: If a job is claimed but not updated for >5 min, it's reclaimed (prevents zombie workers).
 
+**Known limitation:** `handoffs` has an `idempotency_key` (unique constraint + insert-time conflict
+handling), so a retried handoff is safely a no-op. `vendor_quotes` doesn't have the equivalent yet —
+if a `vendor.rfq` job is reclaimed and rerun after partially inserting quotes (e.g. a worker crash
+mid-loop), it can insert duplicate rows for the same purchase request. Not exercised by the golden
+path or the current test scenarios; fix is a unique constraint on `(purchase_request_id, vendor_id)`
+plus an upsert, mirroring the `handoffs` pattern.
+
 **Observability:**
 - Agent step logs: input, output, model, latency, tokens, reasoning.
 - Handoff status: pending → processing → done/failed/rejected.
