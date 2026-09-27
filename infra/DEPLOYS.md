@@ -123,3 +123,32 @@ with the last deploy.
 restart; demo sign-in → `200` with access token; `curl -sSI https://kettle.4625labs.com` → `401`.
 
 **Result: full success.**
+
+## 2026-09-27 14:09 UTC — `44031f7` — SUCCESS (frontend-only: Orchestrator/Sales lane overlap fix)
+
+**What:** `main @ 44031f7` (merged `agent/frontend`) — widened the Orchestrator lane column from
+72px to 104px in `web/src/components/run/RunViewStates.tsx` so its label stops overlapping the
+Sales lane on the run page. One-line change. No migrations, no env changes (reused
+`/opt/kettle/current/web/.env` byte-for-byte in the new release dir). User-approved.
+
+**Note:** this session's `~/.ssh/config` was missing at the start of this deploy (recreated the
+three `Host` entries from `infra/README.md`'s documented IPs/key, user-approved). SSH to VM-C also
+timed out on the first attempt — turned out to be the Vultr firewall/API-key IP allowlist not
+having this session's current network IP, not a sandbox or VM issue; the user added the IP
+alongside the existing one and it connected cleanly on retry.
+
+**Steps:** merged `main` into `agent/infra` (fast-forward, one file), `npm ci` (node_modules was
+stale from the earlier QA/docs merge), `npm run build` (fixed stale Next.js route-type errors from
+before the `npm ci`), `tsc --noEmit` clean, lint clean (pre-existing warnings only). Shipped via
+`git archive`, copied `.env` into the new release dir, pointed `current` at it, `docker compose
+build && up -d`, restarted `kettle-expose-watcher`.
+
+**F6 render smoke check:** same known invoice PDF (`PO-8199120/CD-8199120.pdf`) → **70916 bytes**,
+zero font errors. Consistent with prior deploys.
+
+**Verified, all passed:** `/api/health` → `200`; worker clean start + 2 heartbeats; watcher clean
+restart (`journalctl` showed a clean stop/start cycle); demo sign-in (`ops@kettle.demo`, password
+read from VM-B's `/root/supabase/.env`, never printed) → `200`; `curl -sSI
+https://kettle.4625labs.com` from VM-C → `401` (NetBird auth gate, as expected).
+
+**Result: full success.**
