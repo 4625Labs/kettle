@@ -1,6 +1,6 @@
 # Kettle: Status & Handoff
 
-Snapshot: **2026-09-26, evening (Sat)**. Deadline: **Sun 2026-09-27 12:00 PM PT**.
+Snapshot: **2026-09-26, late night (Sat)**. Deadline: **Sun 2026-09-27 12:00 PM PT**.
 Read this first when resuming. Requirement IDs refer to [`REQUIREMENTS.md`](REQUIREMENTS.md);
 the agent playbook is [`agents/README.md`](agents/README.md).
 
@@ -15,8 +15,11 @@ the agent playbook is [`agents/README.md`](agents/README.md).
   Zero public ports on the app/DB VMs.
 - Live deploy: `main` @ `9bdd22c` on VM-A, deployed and smoke-tested (health, sign-in, worker
   heartbeat, watcher restart, PDF render check).
-- **Not started:** QA & docs agent (README rewrite, `ARCHITECTURE.md`, `DEMO.md`, Playwright smoke
-  test), demo video/rehearsal, GitHub push, flipping the repo public.
+- **Docs done:** README rewrite, `ARCHITECTURE.md`, `DEMO.md` merged (`1e11cf8`). The Playwright
+  smoke test (`web/tests/smoke.spec.ts`) is **shelved**: it type-checks but 0/4 pass (written
+  against guessed selectors); `npm run eval` is the verification path.
+- Git history scanned for secrets before going public: clean (no keys, JWTs, tokens, passwords).
+- **Not started:** demo video/rehearsal, GitHub push, flipping the repo public.
 - GitHub `4625Labs/kettle` is **private**, at `3cf7173`. `main` locally is far ahead (`71d3214`).
   **Push only when the user asks, then flip to public before submission.**
 
@@ -24,7 +27,7 @@ the agent playbook is [`agents/README.md`](agents/README.md).
 
 | Ref | Commit | Notes |
 |---|---|---|
-| local `main` | `71d3214` | everything merged; clean |
+| local `main` | after `1e11cf8` | everything merged, incl. `agent/qa-docs`; clean |
 | `origin/main` | `3cf7173` | push pending (lead only) |
 | `agent/*` branches | merged into main, worktrees idle | infra, frontend active this wave; data, agents-core, simworld finished earlier |
 
@@ -138,16 +141,16 @@ Legend: ✅ done · 🟡 partial / in progress · ⬜ not started
 
 ## Pending, in priority order
 
-1. **QA & docs agent** (Haiku, `docs/agents/qa-docs.md`, not started): README rewrite with
-   architecture diagram, `docs/ARCHITECTURE.md`, `docs/DEMO.md`, Playwright smoke test reusing
-   `TEST-PLAN.md`'s scenarios.
-2. **Demo**: rehearse, 1-minute video from the deployed URL, backup recording.
-3. **Submission**: push `main` (lead only, on the user's word), **make the repo public**, decide
-   how judges get the NetBird password + demo logins, submit before 12:00 PM Sunday.
+1. **Demo**: rehearse `docs/DEMO.md` on the deployed URL in a private window, 1-minute video,
+   backup recording. The demo uses the seeded deal (S1 create/edit UI is the one open P0).
+2. **Submission**: push `main` (lead only, on the user's word), **make the repo public**, submit
+   before 12:00 PM Sunday. NetBird password + demo logins go in the submission form's private
+   notes (decided 2026-09-26).
 
 ## Optional / stretch
 
 - Full VM-A reboot test (so far only a Docker restart has been verified).
+- Rewrite the shelved Playwright smoke test against the real selectors.
 - Regenerate the diagrams page (published artifact) if the README/architecture changes.
 - Diagrams: `docs/diagrams/` (10 Mermaid diagrams + README), published as a page — link is in
   `infra/ACTIONS.md`'s history if needed again.

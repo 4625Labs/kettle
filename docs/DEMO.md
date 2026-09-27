@@ -308,11 +308,10 @@ npm run demo:reset
 - [ ] Test projector HDMI beforehand.
 
 ### 9. Final Checks
-- [ ] Run the Playwright smoke test locally (if time):
+- [ ] Run the golden-path eval locally (if time):
   ```bash
-  npm test
+  cd web && npm run eval -- 1 --late
   ```
-  All tests should pass (or be marked skip for deployed-only tests).
 
 - [ ] Verify the demo reset script works:
   ```bash
@@ -341,7 +340,7 @@ npm run demo:reset
 - [ ] **docs/ARCHITECTURE.md** explains agents, handoffs, guardrails.
 - [ ] **docs/DEMO.md** (this file) is in the repo.
 - [ ] **1-minute video** is uploaded and linked in the submission.
-- [ ] **Playwright tests** exist and pass against local Supabase: `npm test`.
+- [ ] **Golden-path eval** passes against local Supabase: `npm run eval`.
 - [ ] **Demo URL** (https://kettle.4625labs.com) is live and working.
 - [ ] **Demo credentials** are communicated to judges (email, Slack, etc., not in git).
 - [ ] **No secrets in git** (Vultr keys, database passwords, API keys).

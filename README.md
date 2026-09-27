@@ -130,10 +130,12 @@ npx supabase db reset
 
 # Configure environment (copy the template)
 cp .env.example .env.local
-# Fill in:
-# - SUPABASE_URL: http://localhost:54321 (from supabase start output)
-# - SUPABASE_ANON_KEY: (from supabase start output)
-# - VULTR_INFERENCE_API_KEY: (leave blank for local; or fill in if testing inference)
+# Fill in (run `npx supabase status -o env` for the local values):
+# - NEXT_PUBLIC_SUPABASE_URL:      API_URL (http://127.0.0.1:54321)
+# - NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY
+# - SUPABASE_SERVICE_ROLE_KEY:     SERVICE_ROLE_KEY (used by the worker)
+# - VULTR_INFERENCE_BASE_URL / _API_KEY / _MODEL: required; the agents
+#   and vendor personas reason through Vultr Serverless Inference
 ```
 
 ### Running
@@ -141,7 +143,7 @@ cp .env.example .env.local
 **Terminal 1: Next.js dev server**
 ```bash
 npm run dev
-# Opens http://localhost:3004
+# Opens http://localhost:3000
 ```
 
 **Terminal 2: Agent worker**
@@ -164,21 +166,16 @@ Sales Rep:           sales@kettle.demo / kettle-demo
 Finance Controller:  finance@kettle.demo / kettle-demo
 ```
 
-### Running Smoke Tests
+### End-to-end check
 
 ```bash
-# Start local Supabase and Next.js dev server (see above)
-
-# In a new terminal:
-npm test
-
-# To run a specific test:
-npm test -- smoke.spec.ts
-
-# To run against deployed Vultr instance:
-KETTLE_BASE_URL=https://kettle.4625labs.com npm test
-# (You will need to provide NetBird password via env var or browser prompt)
+# With local Supabase running and .env.local filled in:
+npm run eval              # golden path x5: deal → PO → invoice anomaly → dispute → payment
+npm run eval -- 1 --late  # one run where the customer pays late (overdue follow-up)
 ```
+
+`web/tests/smoke.spec.ts` is an unfinished Playwright draft and does not pass yet;
+use `npm run eval` to verify a setup.
 
 ## Deployed Status
 
@@ -268,7 +265,7 @@ infra/
 - **Source of truth:** `docs/REQUIREMENTS.md` (requirement IDs like F2, K4).
 - **Ground rules for agents:** `docs/agents/_ground-rules.md` (binding).
 - **Commit format:** Reference requirement IDs. Example: `fix(F3): flag mismatched invoice amounts (tolerance 5%)`.
-- **Tests:** `npm test` (Playwright) or `npm run eval -- --late` (end-to-end golden path).
+- **Tests:** `npm run eval` / `npm run eval -- 1 --late` (end-to-end golden path).
 
 ## FAQ
 
@@ -297,7 +294,7 @@ Golden path: ~19 seconds (5 runs averaging 16 LLM calls each, 0 fallbacks). Real
 - **Live demo:** https://kettle.4625labs.com
 - **README setup:** Follow "Local Setup" above to run against local Supabase.
 - **Test plan:** See [`docs/TEST-PLAN.md`](docs/TEST-PLAN.md) for 10 scenarios (access, happy path, anomaly, rejection, roles, etc.).
-- **Smoke tests:** `npm test` (requires local Supabase running).
+- **End-to-end check:** `cd web && npm run eval` (requires local Supabase and the Vultr inference env).
 - **Demo script:** [`docs/DEMO.md`](docs/DEMO.md) (3 minutes, all beats covered).
 - **Architecture:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (agents, handoffs, orchestrator, guardrails).
 
