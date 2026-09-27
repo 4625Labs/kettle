@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { RunView } from "@/components/run/RunView";
+import type { Role } from "@/app/_lib/session";
 import { buildTimeline, type AgentStepRow, type ApprovalRow, type HandoffRow } from "./map";
+import { parseRunOptions, type RunOptions } from "./expose";
 
 function upsertById<T extends { id: string }>(rows: T[], row: T): T[] {
   const i = rows.findIndex((r) => r.id === row.id);
@@ -24,17 +26,22 @@ async function authenticatedRealtime(supabase: ReturnType<typeof createClient>) 
 }
 
 export function LiveRunView({
+  role,
   initialRunId,
+  initialOptions,
   initialSteps,
   initialHandoffs,
   initialApprovals,
 }: {
+  role: Role;
   initialRunId: string | null;
+  initialOptions: RunOptions;
   initialSteps: AgentStepRow[];
   initialHandoffs: HandoffRow[];
   initialApprovals: ApprovalRow[];
 }) {
   const [runId, setRunId] = useState(initialRunId);
+  const [options, setOptions] = useState(initialOptions);
   const [steps, setSteps] = useState(initialSteps);
   const [handoffs, setHandoffs] = useState(initialHandoffs);
   const [approvals, setApprovals] = useState(initialApprovals);
@@ -55,8 +62,9 @@ export function LiveRunView({
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "agent_runs" },
           (payload) => {
-            const row = payload.new as { id: string };
+            const row = payload.new as { id: string; options: unknown };
             setRunId(row.id);
+            setOptions(parseRunOptions(row.options));
             setSteps([]);
             setHandoffs([]);
             setApprovals([]);
@@ -71,7 +79,9 @@ export function LiveRunView({
     };
   }, []);
 
-  // A run is active: stream its steps, handoffs, and approval decisions.
+  // A run is active: stream its steps, handoffs, approval decisions, and the
+  // options the run started (N4's expose link lands here once the host
+  // watcher writes it).
   useEffect(() => {
     if (!runId) return;
     const supabase = createClient();
@@ -109,6 +119,14 @@ export function LiveRunView({
             setApprovals((prev) => upsertById(prev, row));
           },
         )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "agent_runs", filter: `id=eq.${runId}` },
+          (payload) => {
+            const row = payload.new as { options: unknown };
+            setOptions(parseRunOptions(row.options));
+          },
+        )
         .subscribe();
     });
 
@@ -123,5 +141,5 @@ export function LiveRunView({
     [steps, handoffs, approvals],
   );
 
-  return <RunView timeline={timeline} />;
+  return <RunView timeline={timeline} role={role} exposeOptions={options} />;
 }

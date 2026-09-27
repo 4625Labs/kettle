@@ -9,7 +9,7 @@ import { RunView } from "@/components/run/RunView";
 // this demo (nothing here can actually fail to load) or shows the original
 // mock golden path for design review — never used by the live control bar.
 export default async function RunPage({ searchParams }: PageProps<"/run">) {
-  await requireSession();
+  const session = await requireSession();
   const { state } = await searchParams;
 
   if (state === "loading") return <RunViewLoading />;
@@ -25,7 +25,9 @@ export default async function RunPage({ searchParams }: PageProps<"/run">) {
   return (
     <LiveRunView
       key={latest?.runId ?? "empty"}
+      role={session.role}
       initialRunId={latest?.runId ?? null}
+      initialOptions={latest?.options ?? {}}
       initialSteps={latest?.steps ?? []}
       initialHandoffs={latest?.handoffs ?? []}
       initialApprovals={latest?.approvals ?? []}

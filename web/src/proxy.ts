@@ -49,8 +49,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Excludes /api/health so Infra's Docker healthcheck gets a 200 without
-  // auth. Keep this the only public API route — anything else under /api
-  // needs its own exception here, reviewed the same way.
-  matcher: ["/((?!api/health|_next/static|_next/image|favicon.ico|.*\\.svg$).*)"],
+  // Excludes /api/health (Infra's Docker healthcheck needs a 200 without
+  // auth) and /r/* (N4's read-only per-run link — gated by the NetBird PIN
+  // on that URL, not Supabase auth). Keep these the only public exceptions;
+  // anything else needs its own reviewed exception here.
+  matcher: ["/((?!api/health|r/|_next/static|_next/image|favicon.ico|.*\\.svg$).*)"],
 };

@@ -1,9 +1,11 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { AgentStepRow, ApprovalRow, HandoffRow } from "./map";
+import { parseRunOptions, type RunOptions } from "./expose";
 
 export interface LatestRun {
   runId: string;
+  options: RunOptions;
   steps: AgentStepRow[];
   handoffs: HandoffRow[];
   approvals: ApprovalRow[];
@@ -16,7 +18,7 @@ export async function getLatestRun(): Promise<LatestRun | null> {
 
   const { data: run } = await supabase
     .from("agent_runs")
-    .select("id")
+    .select("id, options")
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -31,6 +33,7 @@ export async function getLatestRun(): Promise<LatestRun | null> {
 
   return {
     runId: run.id,
+    options: parseRunOptions(run.options),
     steps: steps ?? [],
     handoffs: handoffs ?? [],
     approvals: approvals ?? [],

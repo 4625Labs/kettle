@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import type { AgentStep, TimelineItem } from "@/app/run/_mock/types";
+import type { Role } from "@/app/_lib/session";
+import type { RunOptions } from "@/app/run/_lib/expose";
 import { laneSpan, LANE_COLUMN_CLASS } from "./lanes";
 import { StepCard } from "./StepCard";
 import { HandoffArrow } from "./HandoffArrow";
 import { StepInspectorDrawer } from "./StepInspectorDrawer";
 import { ControlBar } from "./ControlBar";
+import { ExposeLinkBanner } from "./ExposeLinkBanner";
 import { RunViewEmpty, GRID_COLS_CLASS, LaneHeaders } from "./RunViewStates";
 
 // Every possible lane-to-lane span in a 4-column grid, spelled out as literal
@@ -33,13 +36,24 @@ function OrchestratorMarker({ step }: { step: AgentStep }) {
   );
 }
 
-export function RunView({ timeline }: { timeline: TimelineItem[] }) {
+export function RunView({
+  timeline,
+  role,
+  exposeOptions,
+  hideControls = false,
+}: {
+  timeline: TimelineItem[];
+  role?: Role;
+  exposeOptions?: RunOptions;
+  hideControls?: boolean;
+}) {
   const [selected, setSelected] = useState<AgentStep | null>(null);
 
   if (timeline.length === 0) {
     return (
       <div className="flex flex-1 flex-col">
-        <ControlBar />
+        {!hideControls && <ControlBar />}
+        {role && exposeOptions && <ExposeLinkBanner role={role} options={exposeOptions} />}
         <RunViewEmpty />
       </div>
     );
@@ -47,7 +61,8 @@ export function RunView({ timeline }: { timeline: TimelineItem[] }) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <ControlBar />
+      {!hideControls && <ControlBar />}
+      {role && exposeOptions && <ExposeLinkBanner role={role} options={exposeOptions} />}
       <LaneHeaders sticky />
 
       <div className={`grid flex-1 gap-x-3 gap-y-2 overflow-y-auto px-4 py-3 ${GRID_COLS_CLASS}`}>
