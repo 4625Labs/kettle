@@ -5,7 +5,7 @@ const opsEmail = process.env.KETTLE_OPS_EMAIL || "ops@kettle.demo";
 const opsPassword = process.env.KETTLE_OPS_PASSWORD || "kettle-demo";
 const financeEmail = process.env.KETTLE_FINANCE_EMAIL || "finance@kettle.demo";
 const financePassword = process.env.KETTLE_FINANCE_PASSWORD || "kettle-demo";
-const netlifyPassword = process.env.KETTLE_NETBIRD_PASSWORD || "";
+const netbirdPassword = process.env.KETTLE_NETBIRD_PASSWORD || "";
 
 test.describe("Kettle Smoke Tests", () => {
   test.beforeEach(async ({ page }) => {
@@ -193,7 +193,7 @@ test.describe("Kettle Smoke Tests", () => {
   test("Scenario 7: Per-run link (NetBird N4)", async ({ page, browser }) => {
     // This test is for deployed instances with NetBird only.
     // Skip locally unless KETTLE_NETBIRD_PASSWORD is set.
-    if (!netlifyPassword) {
+    if (!netbirdPassword) {
       test.skip();
     }
 
