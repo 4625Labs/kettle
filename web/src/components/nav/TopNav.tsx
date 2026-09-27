@@ -19,20 +19,6 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   );
 }
 
-function ComingSoonLink({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      title="Ships in phase 2"
-      className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-foreground/30"
-    >
-      {children}
-      <span className="hidden rounded-full border border-border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/40 sm:inline">
-        Soon
-      </span>
-    </span>
-  );
-}
-
 export async function TopNav() {
   const session = await getSession();
 
@@ -46,7 +32,7 @@ export async function TopNav() {
         <nav className="order-3 flex w-full items-center gap-1 sm:order-none sm:w-auto">
           <NavLink href="/run">Run</NavLink>
           <NavLink href="/approvals">Approvals</NavLink>
-          <ComingSoonLink>Deals</ComingSoonLink>
+          <NavLink href="/deals">Deals</NavLink>
         </nav>
       ) : null}
 
