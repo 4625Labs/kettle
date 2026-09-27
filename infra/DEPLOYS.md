@@ -80,3 +80,30 @@ restart to pick up the new service-role key. Clean restart, no crash.
 
 **Result: full success.** All three rotated secrets (JWT/anon/service-role, Vultr Inference key)
 now in place end to end; app, worker, and N4 watcher all confirmed working on the new keys.
+
+## 2026-09-27 00:44 UTC — `e668acc` — SUCCESS (worker font fix + deal page + polish)
+
+**What:** `main @ e668acc` — worker image font fix (F6 bug from earlier today), deal page,
+frontend polish, regenerated Supabase types, docs. No key changes (reused the existing
+`/opt/kettle/current/web/.env`, copied byte-for-byte into the new release dir, not regenerated).
+No new migrations (0007 already applied to VM-B).
+
+**Steps:** `git archive` to `/opt/kettle/releases/e668acc`, copied the prior release's `.env` in
+(600 perms), pointed `current` at it, `docker compose build && up -d`, restarted
+`kettle-expose-watcher`.
+
+**New step 6 — F6 render smoke check (first time running this):** downloaded the same known
+invoice PDF (`PO-8199120/CD-8199120.pdf`) inside the worker container via Node's built-in `fetch`,
+ran `pdftoppm -png -r 150` on it exactly as `render-pdf.ts` does → **70916 bytes, zero font
+errors** (well above the ~30KB threshold; this morning's blank-render bug would have produced
+~8.5KB here). Confirms the font fix works in the actual redeployed image, not just the earlier
+live-patched test container.
+
+**Verified, all passed:**
+- `/api/health` → `200`.
+- Worker: clean start, 2 heartbeat lines.
+- `kettle-expose-watcher`: clean restart, no crash.
+- Demo sign-in (`ops@kettle.demo`) → `200`, valid access token.
+- `curl -sSI https://kettle.4625labs.com` from VM-C → `401` (auth page, as expected).
+
+**Result: full success.**
