@@ -33,7 +33,9 @@ export default async function PublicRunPage({ params }: PageProps<"/r/[runId]">)
     <div className="flex flex-1 flex-col">
       <div className="border-b border-border bg-surface px-6 py-3">
         <p className="text-sm font-medium">{run.goal}</p>
-        <p className="text-xs text-foreground/50">Read-only view · run status: {run.status}</p>
+        <p className="text-xs text-foreground/50">
+          Read-only run view · link expires when this run ends · status: {run.status}
+        </p>
       </div>
       <RunView timeline={timeline} hideControls />
     </div>
