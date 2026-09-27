@@ -6,9 +6,7 @@ export interface DealLifecycle {
   deal: Tables<"deals"> & { company: Tables<"companies"> | null };
   lineItems: (Tables<"deal_line_items"> & { product: Tables<"products"> | null })[];
   purchaseRequests: Tables<"purchase_requests">[];
-  // TODO(data): drop `message` here once types.ts is regenerated — migration
-  // 0006 added vendor_quotes.message but the generated types predate it.
-  quotes: (Tables<"vendor_quotes"> & { message: string | null; vendor: Tables<"companies"> | null })[];
+  quotes: (Tables<"vendor_quotes"> & { vendor: Tables<"companies"> | null })[];
   purchaseOrders: (Tables<"purchase_orders"> & {
     vendor: Tables<"companies"> | null;
     approval: Tables<"approvals"> | null;
