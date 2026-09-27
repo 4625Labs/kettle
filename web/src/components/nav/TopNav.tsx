@@ -45,7 +45,7 @@ export async function TopNav() {
       {session ? (
         <nav className="order-3 flex w-full items-center gap-1 sm:order-none sm:w-auto">
           <NavLink href="/run">Run</NavLink>
-          <ComingSoonLink>Approvals</ComingSoonLink>
+          <NavLink href="/approvals">Approvals</NavLink>
           <ComingSoonLink>Deals</ComingSoonLink>
         </nav>
       ) : null}
