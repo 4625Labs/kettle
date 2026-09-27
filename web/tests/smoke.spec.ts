@@ -223,6 +223,7 @@ test.describe("Kettle Smoke Tests", () => {
 
     if (!urlMatch || !pinMatch) {
       test.skip();
+      return;
     }
 
     const perRunUrl = urlMatch[0];
