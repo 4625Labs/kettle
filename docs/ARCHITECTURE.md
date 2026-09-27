@@ -72,7 +72,8 @@ Sales Agent          Procurement Agent          Finance Agent
 - `review_corrected_invoice` — When the vendor sends a corrected invoice, validate it and hand back to Finance: `invoice.corrected`.
 
 **Guardrails:**
-- RFQ timeout: if vendors don't respond in 30s, use fallback prices.
+- RFQ responses are simulated deterministically per vendor persona (seeded by purchase request +
+  vendor id), not fetched live — there's no vendor timeout or fallback price to reason about.
 - Approval gate: PO ≥ $10k blocks until ops_manager approves.
 - Dispute tolerance: flag if actual invoice ≥ 5% over quoted.
 
@@ -115,7 +116,9 @@ Sales Agent          Procurement Agent          Finance Agent
 2. The orchestrator calls an LLM with the event context and asks: "Which agent action should handle this?"
 3. The LLM returns a route (e.g., `sales.validate_won_deal`).
 4. Code **validates** the route against a static allow-list (HANDOFF_ALLOW_LIST + ROUTES).
-5. If valid: agent executes. If invalid or off-list: **forced route** (most likely recovery path) + logged escalation.
+5. If valid: agent executes, step status `ok`. If invalid or off-list: **forced route** (the
+   allow-listed route for that event) + step status `flagged` — this is logged for audit, but does
+   not stop the run or count as an escalation (see K6 below).
 6. Step is recorded with input, output, LLM model, latency, tokens, and reasoning.
 
 **Allow-List (excerpt):**
@@ -131,8 +134,13 @@ approval.decided → [resume corresponding agent]
 **Guardrails on Orchestrator:**
 - **Step cap:** Max N routing decisions per run (e.g., 20). If exceeded → escalate to human.
 - **Loop detection:** If the same agent-action pair is routed 3+ times for the same event → escalate.
-- **Invalid route:** If LLM suggests an off-list route (e.g., finance trying to issue a PO) → log as escalation, force the closest valid route.
-- **Timeout:** If an LLM call takes >30s, fallback to a deterministic default route.
+- **Invalid route:** If the LLM suggests an off-list route (e.g., finance trying to issue a PO) →
+  flag the step (`status: 'flagged'`, rationale explains the override) and force the one allow-listed
+  route for that event. The run is not stopped or marked failed — only step-cap and loop-detection
+  do that (K6).
+- **Timeout:** The orchestrator's own routing call times out at 15s; other agents' LLM calls use a
+  20s timeout. Either way, on timeout or any model failure, the call returns its deterministic
+  fallback value instead (for routing: the allow-listed route itself) — the run keeps going.
 
 **Why AI instead of a state machine?**
 - Agents can communicate flexibly. If the orchestrator learns (e.g., from examples) that a new handoff type should exist, the routes can adapt without code changes.
@@ -273,9 +281,11 @@ CREATE TABLE approvals (
 An escalation happens when:
 
 1. **Step cap exceeded:** ≥20 orchestrator routing decisions in one run (suggests a loop or policy violation).
-2. **Loop detected:** The same agent-action pair routed 3+ times for the same event.
+2. **Loop detected:** The same handoff type is routed between the same two agents more than 3 times in one run.
 3. **Agent failure:** Agent raises an error (e.g., "Vendor not found"). Orchestrator logs it and escalates.
-4. **Invalid route:** LLM suggests a route not in the allow-list.
+
+An invalid/off-list route is **not** on this list — it's flagged and silently corrected to the
+allow-listed route (see the Orchestrator guardrails above); the run continues normally.
 
 When escalated:
 - An `escalate` step is recorded in agent_steps.
@@ -383,8 +393,11 @@ When a step is recorded (worker inserts a row), Supabase Realtime broadcasts it 
 - **Total end-to-end:** ~19s (5 runs avg, deterministic fallback if LLM is slow).
 
 **Reliability:**
-- LLM fallback: If `deepseek-v4.1-flash` times out, use deterministic scoring (price * weight).
-- Vendor fallback: If vendor doesn't respond in 30s, use seeded default prices.
+- LLM fallback: any model call (route, score, extract, etc.) that errors or times out (15s for
+  routing, 20s for other agent calls) returns a deterministic fallback value instead of failing the
+  step.
+- Vendor quotes: generated deterministically from seeded personas, not a live call — nothing to
+  time out or fall back on.
 - Retry: Failed jobs retry with exponential backoff (base 500ms) up to 5x.
 - Stale job reaper: If a job is claimed but not updated for >5 min, it's reclaimed (prevents zombie workers).
 
